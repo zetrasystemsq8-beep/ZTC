@@ -12,4 +12,6 @@
   static const String forgotPassword = '/forgot-password';
   static const String wallet = '/wallet';
   static const String transactions = '/transactions';
+  static const String sendMoney = '/send';
+  static const String receiveMoney = '/receive';
 }

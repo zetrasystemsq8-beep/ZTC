@@ -26,3 +26,6 @@ export '../features/wallet/presentation/widgets/wallet_widgets.dart';
 export '../features/transactions/presentation/screens/transactions_list_screen.dart';
 export '../features/transactions/presentation/screens/transaction_detail_screen.dart';
 export '../features/transactions/presentation/widgets/transactions_widgets.dart';
+export '../features/send_receive/presentation/screens/send_money_screen.dart';
+export '../features/send_receive/presentation/screens/receive_money_screen.dart';
+export '../features/send_receive/presentation/widgets/send_receive_widgets.dart';

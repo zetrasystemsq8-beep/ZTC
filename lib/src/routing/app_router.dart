@@ -11,6 +11,8 @@ import 'package:ztc_bank/src/features/onboarding/presentation/screens/onboarding
 import 'package:ztc_bank/src/features/wallet/presentation/screens/wallet_home.dart';
 import 'package:ztc_bank/src/features/transactions/presentation/screens/transactions_list_screen.dart';
 import 'package:ztc_bank/src/features/transactions/presentation/screens/transaction_detail_screen.dart';
+import 'package:ztc_bank/src/features/send_receive/presentation/screens/send_money_screen.dart';
+import 'package:ztc_bank/src/features/send_receive/presentation/screens/receive_money_screen.dart';
 
 
 final GoRouter appRouter = GoRouter(
@@ -59,6 +61,16 @@ final GoRouter appRouter = GoRouter(
       path: AppRoutes.transactions,
       name: 'transactions',
       builder: (context, state) => const TransactionsListScreen(),
+    ),
+    GoRoute(
+      path: AppRoutes.sendMoney,
+      name: 'sendMoney',
+      builder: (context, state) => const SendMoneyScreen(),
+    ),
+    GoRoute(
+      path: AppRoutes.receiveMoney,
+      name: 'receiveMoney',
+      builder: (context, state) => const ReceiveMoneyScreen(),
     ),
   ],
 );
