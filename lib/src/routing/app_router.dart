@@ -8,6 +8,7 @@ import 'package:ztc_bank/src/features/auth/presentation/screens/forgot_password_
 
 import 'package:ztc_bank/src/features/home/presentation/screens/home_page.dart';
 import 'package:ztc_bank/src/features/onboarding/presentation/screens/onboarding_page.dart';
+import 'package:ztc_bank/src/features/wallet/presentation/screens/wallet_home.dart';
 
 
 final GoRouter appRouter = GoRouter(
@@ -38,6 +39,11 @@ final GoRouter appRouter = GoRouter(
       path: AppRoutes.home,
       name: 'home',
       builder: (context, state) => const HomePage(),
+    ),
+    GoRoute(
+      path: AppRoutes.wallet,
+      name: 'wallet',
+      builder: (context, state) => const WalletHome(),
     ),
   ],
 );

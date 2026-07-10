@@ -21,3 +21,5 @@ export '../features/auth/presentation/screens/signup_screen.dart';
 export '../features/auth/presentation/screens/forgot_password_screen.dart';
 export '../features/home/presentation/screens/home_page.dart';
 export '../features/onboarding/presentation/screens/onboarding_page.dart';
+export '../features/wallet/presentation/screens/wallet_home.dart';
+export '../features/wallet/presentation/widgets/wallet_widgets.dart';
