@@ -13,41 +13,35 @@ class WalletRepositoryImpl implements WalletRepository {
 
   @override
   FutureEither<Wallet> getWallet() async {
-    try {
-      final response = await _dioService.get('/wallet');
-      
-      if (response.statusCode == 200) {
+    final result = await _dioService.get('/wallet');
+
+    return result.fold(
+      (failure) => left(failure),
+      (response) {
         final data = response.data as Map<String, dynamic>;
         final wallet = WalletModel.fromJson(data);
         return right(wallet);
-      }
-      
-      return left(ServerFailure('Failed to fetch wallet'));
-    } catch (e) {
-      return left(ServerFailure(e.toString()));
-    }
+      },
+    );
   }
 
   @override
   FutureEither<List<Transaction>> getRecentTransactions({int limit = 10}) async {
-    try {
-      final response = await _dioService.get(
-        '/wallet/transactions',
-        queryParameters: {'limit': limit},
-      );
-      
-      if (response.statusCode == 200) {
+    final result = await _dioService.get(
+      '/wallet/transactions',
+      queryParameters: {'limit': limit},
+    );
+
+    return result.fold(
+      (failure) => left(failure),
+      (response) {
         final data = response.data as List<dynamic>;
         final transactions = data
             .map((json) => TransactionModel.fromJson(json as Map<String, dynamic>))
             .toList();
         return right(transactions);
-      }
-      
-      return left(ServerFailure('Failed to fetch transactions'));
-    } catch (e) {
-      return left(ServerFailure(e.toString()));
-    }
+      },
+    );
   }
 
   @override
@@ -55,26 +49,23 @@ class WalletRepositoryImpl implements WalletRepository {
     required double amount,
     required String description,
   }) async {
-    try {
-      final response = await _dioService.post(
-        '/wallet/deposit',
-        data: {
-          'amount': amount,
-          'description': description,
-        },
-      );
-      
-      if (response.statusCode == 200 || response.statusCode == 201) {
+    final result = await _dioService.post(
+      '/wallet/deposit',
+      data: {
+        'amount': amount,
+        'description': description,
+      },
+    );
+
+    return result.fold(
+      (failure) => left(failure),
+      (response) {
         final transaction = TransactionModel.fromJson(
           response.data as Map<String, dynamic>,
         );
         return right(transaction);
-      }
-      
-      return left(ServerFailure('Deposit failed'));
-    } catch (e) {
-      return left(ServerFailure(e.toString()));
-    }
+      },
+    );
   }
 
   @override
@@ -82,26 +73,23 @@ class WalletRepositoryImpl implements WalletRepository {
     required double amount,
     required String description,
   }) async {
-    try {
-      final response = await _dioService.post(
-        '/wallet/withdraw',
-        data: {
-          'amount': amount,
-          'description': description,
-        },
-      );
-      
-      if (response.statusCode == 200 || response.statusCode == 201) {
+    final result = await _dioService.post(
+      '/wallet/withdraw',
+      data: {
+        'amount': amount,
+        'description': description,
+      },
+    );
+
+    return result.fold(
+      (failure) => left(failure),
+      (response) {
         final transaction = TransactionModel.fromJson(
           response.data as Map<String, dynamic>,
         );
         return right(transaction);
-      }
-      
-      return left(ServerFailure('Withdrawal failed'));
-    } catch (e) {
-      return left(ServerFailure(e.toString()));
-    }
+      },
+    );
   }
 
   @override
@@ -110,27 +98,24 @@ class WalletRepositoryImpl implements WalletRepository {
     required String recipientEmail,
     required String description,
   }) async {
-    try {
-      final response = await _dioService.post(
-        '/wallet/send',
-        data: {
-          'amount': amount,
-          'recipientEmail': recipientEmail,
-          'description': description,
-        },
-      );
-      
-      if (response.statusCode == 200 || response.statusCode == 201) {
+    final result = await _dioService.post(
+      '/wallet/send',
+      data: {
+        'amount': amount,
+        'recipientEmail': recipientEmail,
+        'description': description,
+      },
+    );
+
+    return result.fold(
+      (failure) => left(failure),
+      (response) {
         final transaction = TransactionModel.fromJson(
           response.data as Map<String, dynamic>,
         );
         return right(transaction);
-      }
-      
-      return left(ServerFailure('Send failed'));
-    } catch (e) {
-      return left(ServerFailure(e.toString()));
-    }
+      },
+    );
   }
 
   @override
@@ -138,25 +123,22 @@ class WalletRepositoryImpl implements WalletRepository {
     required double amount,
     required String description,
   }) async {
-    try {
-      final response = await _dioService.post(
-        '/wallet/receive',
-        data: {
-          'amount': amount,
-          'description': description,
-        },
-      );
-      
-      if (response.statusCode == 200 || response.statusCode == 201) {
+    final result = await _dioService.post(
+      '/wallet/receive',
+      data: {
+        'amount': amount,
+        'description': description,
+      },
+    );
+
+    return result.fold(
+      (failure) => left(failure),
+      (response) {
         final transaction = TransactionModel.fromJson(
           response.data as Map<String, dynamic>,
         );
         return right(transaction);
-      }
-      
-      return left(ServerFailure('Receive failed'));
-    } catch (e) {
-      return left(ServerFailure(e.toString()));
-    }
+      },
+    );
   }
 }
