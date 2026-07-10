@@ -11,4 +11,5 @@
   static const String signup = '/signup';
   static const String forgotPassword = '/forgot-password';
   static const String wallet = '/wallet';
+  static const String transactions = '/transactions';
 }

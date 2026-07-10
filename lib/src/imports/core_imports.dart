@@ -23,3 +23,6 @@ export '../features/home/presentation/screens/home_page.dart';
 export '../features/onboarding/presentation/screens/onboarding_page.dart';
 export '../features/wallet/presentation/screens/wallet_home.dart';
 export '../features/wallet/presentation/widgets/wallet_widgets.dart';
+export '../features/transactions/presentation/screens/transactions_list_screen.dart';
+export '../features/transactions/presentation/screens/transaction_detail_screen.dart';
+export '../features/transactions/presentation/widgets/transactions_widgets.dart';
