@@ -28,9 +28,6 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: stable
-          cache: true
-          cache-key: flutter-:os:-:channel:-:version:-:hash:-:arch:
-          pub-cache-key: flutter-pub-:os:-:channel:-:version:-:hash:
 
       - name: Show Flutter Version
         run: flutter --version
@@ -50,8 +47,7 @@ jobs:
         with:
           path: |
             ~/.pub-cache
-            build/
-          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
+          key: ${{ runner.os }}-pub-${{ hashFiles('pubspec.lock') }}
           restore-keys: |
             ${{ runner.os }}-pub-
 
