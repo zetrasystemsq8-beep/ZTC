@@ -1,6 +1,6 @@
 import 'package:ztc_bank/src/imports/core_imports.dart';
 import 'package:ztc_bank/src/imports/packages_imports.dart';
-
+import 'package:ztc_bank/src/core/network/dio_service.dart';
 import 'package:ztc_bank/src/features/send_receive/domain/entities/user.dart';
 import 'package:ztc_bank/src/features/send_receive/domain/repositories/send_receive_repository.dart';
 import 'package:ztc_bank/src/features/send_receive/data/repositories/send_receive_repository_impl.dart';
@@ -8,7 +8,7 @@ import 'package:ztc_bank/src/features/wallet/domain/entities/transaction.dart';
 
 // Repository Provider
 final sendReceiveRepositoryProvider = Provider<SendReceiveRepository>((ref) {
-  return SendReceiveRepositoryImpl();
+  return SendReceiveRepositoryImpl(DioService.instance);
 });
 
 // Search Users Notifier
@@ -29,8 +29,8 @@ class SearchUsersNotifier extends StateNotifier<AsyncValue<List<User>>> {
     final result = await _repository.searchUsers(query: query);
 
     state = result.fold(
-      (failure) => AsyncValue.error(failure.message, StackTrace.current),
-      (users) => AsyncValue.data(users),
+      (failure) => AsyncValue<List<User>>.error(failure.message, StackTrace.current),
+      (users) => AsyncValue<List<User>>.data(users),
     );
   }
 }
@@ -53,8 +53,8 @@ class RecentRecipientsNotifier extends StateNotifier<AsyncValue<List<User>>> {
     final result = await _repository.getRecentRecipients();
 
     state = result.fold(
-      (failure) => AsyncValue.error(failure.message, StackTrace.current),
-      (users) => AsyncValue.data(users),
+      (failure) => AsyncValue<List<User>>.error(failure.message, StackTrace.current),
+      (users) => AsyncValue<List<User>>.data(users),
     );
   }
 }
@@ -80,8 +80,8 @@ class QRCodeNotifier extends StateNotifier<AsyncValue<String>> {
     final result = await _repository.generateReceiveQRCode();
 
     state = result.fold(
-      (failure) => AsyncValue.error(failure.message, StackTrace.current),
-      (qrCode) => AsyncValue.data(qrCode),
+      (failure) => AsyncValue<String>.error(failure.message, StackTrace.current),
+      (qrCode) => AsyncValue<String>.data(qrCode),
     );
   }
 }
@@ -120,8 +120,8 @@ class TransferNotifier extends StateNotifier<AsyncValue<Transaction>> {
     );
 
     state = result.fold(
-      (failure) => AsyncValue.error(failure.message, StackTrace.current),
-      (transaction) => AsyncValue.data(transaction),
+      (failure) => AsyncValue<Transaction>.error(failure.message, StackTrace.current),
+      (transaction) => AsyncValue<Transaction>.data(transaction),
     );
   }
 }
@@ -160,8 +160,8 @@ class RequestMoneyNotifier extends StateNotifier<AsyncValue<Transaction>> {
     );
 
     state = result.fold(
-      (failure) => AsyncValue.error(failure.message, StackTrace.current),
-      (transaction) => AsyncValue.data(transaction),
+      (failure) => AsyncValue<Transaction>.error(failure.message, StackTrace.current),
+      (transaction) => AsyncValue<Transaction>.data(transaction),
     );
   }
 }
