@@ -29,23 +29,84 @@ jobs:
         with:
           channel: stable
           cache: true
+          cache-key: flutter-:os:-:channel:-:version:-:hash:-:arch:
+          pub-cache-key: flutter-pub-:os:-:channel:-:version:-:hash:
 
       - name: Show Flutter Version
         run: flutter --version
 
+      - name: Cache Gradle dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Cache Flutter dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+            build/
+          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
+
+      - name: Generate Missing Android Files
+        run: |
+          flutter create --platforms=android --skip-creation .
+
+      - name: Create Missing Resource Files
+        run: |
+          mkdir -p android/app/src/main/res/drawable
+          mkdir -p android/app/src/main/res/values
+          mkdir -p android/app/src/main/res/values-night
+          
+          echo '<?xml version="1.0" encoding="utf-8"?>
+          <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+              <item>
+                  <color android:color="@android:color/white"/>
+              </item>
+          </layer-list>' > android/app/src/main/res/drawable/launch_background.xml
+          
+          echo '<?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
+                  <item name="android:windowBackground">@drawable/launch_background</item>
+              </style>
+              <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
+                  <item name="android:windowBackground">?android:colorBackground</item>
+              </style>
+          </resources>' > android/app/src/main/res/values/styles.xml
+          
+          echo '<?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <style name="LaunchTheme" parent="@android:style/Theme.Black.NoTitleBar">
+                  <item name="android:windowBackground">@drawable/launch_background</item>
+              </style>
+              <style name="NormalTheme" parent="@android:style/Theme.Black.NoTitleBar">
+                  <item name="android:windowBackground">?android:colorBackground</item>
+              </style>
+          </resources>' > android/app/src/main/res/values-night/styles.xml
+
       - name: Install Dependencies
         run: flutter pub get
 
-      # Don't stop the workflow if analysis finds issues
+      - name: Run flutter_native_splash
+        run: |
+          flutter pub run flutter_native_splash:create
+
       - name: Analyze Project
         run: flutter analyze || true
 
-      # Don't stop the workflow if tests fail
       - name: Run Tests
         run: flutter test || true
 
       - name: Build APK
-        run: flutter build apk --release --verbose
+        run: flutter build apk --release
 
       - name: Upload APK
         if: success()
