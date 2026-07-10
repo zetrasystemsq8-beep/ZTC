@@ -1,11 +1,10 @@
 import 'package:dartz/dartz.dart';
-import 'package:flutter_clean_architecture/core/network/dio_service.dart';
-import 'package:flutter_clean_architecture/core/error/failure.dart';
-import 'package:flutter_clean_architecture/features/transactions/data/models/transaction_model.dart';
-import 'package:flutter_clean_architecture/features/transactions/domain/entities/transaction.dart';
-import 'package:flutter_clean_architecture/features/transactions/domain/repositories/transaction_repository.dart';
-
-typedef FutureEither<T> = Future<Either<Failure, T>>;
+import 'package:ztc_bank/src/imports/core_imports.dart';
+import 'package:ztc_bank/src/imports/packages_imports.dart';
+import 'package:ztc_bank/src/utils/utils.dart';
+import 'package:ztc_bank/src/features/transactions/data/models/transaction_model.dart';
+import 'package:ztc_bank/src/features/transactions/domain/entities/transaction.dart';
+import 'package:ztc_bank/src/features/transactions/domain/repositories/transaction_repository.dart';
 
 class TransactionRepositoryImpl implements TransactionRepository {
   final DioService _dioService;
