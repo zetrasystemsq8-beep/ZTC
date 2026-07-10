@@ -1,136 +1,51 @@
-import 'package:dartz/dartz.dart';
+import 'package:flutter_clean_architecture/core/di/injection.dart';
 import 'package:flutter_clean_architecture/core/network/dio_service.dart';
-import 'package:flutter_clean_architecture/core/error/failure.dart';
-import 'package:flutter_clean_architecture/features/wallet/data/models/wallet_model.dart';
-import 'package:flutter_clean_architecture/features/wallet/data/models/transaction_model.dart';
-import 'package:flutter_clean_architecture/features/wallet/domain/entities/wallet.dart';
-import 'package:flutter_clean_architecture/features/wallet/domain/entities/transaction.dart';
+import 'package:flutter_clean_architecture/features/wallet/data/repositories/wallet_repository_impl.dart';
 import 'package:flutter_clean_architecture/features/wallet/domain/repositories/wallet_repository.dart';
+import 'package:flutter_clean_architecture/features/wallet/domain/usecases/deposit_usecase.dart';
+import 'package:flutter_clean_architecture/features/wallet/domain/usecases/get_recent_transactions_usecase.dart';
+import 'package:flutter_clean_architecture/features/wallet/domain/usecases/get_wallet_usecase.dart';
+import 'package:flutter_clean_architecture/features/wallet/domain/usecases/receive_usecase.dart';
+import 'package:flutter_clean_architecture/features/wallet/domain/usecases/send_usecase.dart';
+import 'package:flutter_clean_architecture/features/wallet/domain/usecases/withdraw_usecase.dart';
+import 'package:flutter_clean_architecture/features/wallet/presentation/providers/wallet_notifier.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-typedef FutureEither<T> = Future<Either<Failure, T>>;
+final walletRepositoryProvider = Provider<WalletRepository>((ref) {
+  return WalletRepositoryImpl(DioService.instance);
+});
 
-class WalletRepositoryImpl implements WalletRepository {
-  final DioService _dioService;
+final getWalletUseCaseProvider = Provider<GetWalletUseCase>((ref) {
+  return GetWalletUseCase(ref.read(walletRepositoryProvider));
+});
 
-  WalletRepositoryImpl(this._dioService);
+final getRecentTransactionsUseCaseProvider = Provider<GetRecentTransactionsUseCase>((ref) {
+  return GetRecentTransactionsUseCase(ref.read(walletRepositoryProvider));
+});
 
-  @override
-  FutureEither<Wallet> getWallet() async {
-    final result = await _dioService.get('/wallet');
-    return result.fold(
-      (failure) => left(failure),
-      (response) {
-        final data = response.data as Map<String, dynamic>;
-        final walletModel = WalletModel.fromJson(data);
-        return right(walletModel);
-      },
-    );
-  }
+final depositUseCaseProvider = Provider<DepositUseCase>((ref) {
+  return DepositUseCase(ref.read(walletRepositoryProvider));
+});
 
-  @override
-  FutureEither<List<Transaction>> getRecentTransactions() async {
-    final result = await _dioService.get('/transactions/recent');
-    return result.fold(
-      (failure) => left(failure),
-      (response) {
-        final data = response.data as List<dynamic>;
-        final transactions = data
-            .map((json) => TransactionModel.fromJson(json as Map<String, dynamic>))
-            .toList();
-        return right(transactions);
-      },
-    );
-  }
+final withdrawUseCaseProvider = Provider<WithdrawUseCase>((ref) {
+  return WithdrawUseCase(ref.read(walletRepositoryProvider));
+});
 
-  @override
-  FutureEither<Transaction> deposit({
-    required double amount,
-    required String method,
-  }) async {
-    final result = await _dioService.post(
-      '/transactions/deposit',
-      data: {
-        'amount': amount,
-        'method': method,
-      },
-    );
-    return result.fold(
-      (failure) => left(failure),
-      (response) {
-        final data = response.data as Map<String, dynamic>;
-        final transactionModel = TransactionModel.fromJson(data);
-        return right(transactionModel);
-      },
-    );
-  }
+final sendUseCaseProvider = Provider<SendUseCase>((ref) {
+  return SendUseCase(ref.read(walletRepositoryProvider));
+});
 
-  @override
-  FutureEither<Transaction> withdraw({
-    required double amount,
-    required String method,
-  }) async {
-    final result = await _dioService.post(
-      '/transactions/withdraw',
-      data: {
-        'amount': amount,
-        'method': method,
-      },
-    );
-    return result.fold(
-      (failure) => left(failure),
-      (response) {
-        final data = response.data as Map<String, dynamic>;
-        final transactionModel = TransactionModel.fromJson(data);
-        return right(transactionModel);
-      },
-    );
-  }
+final receiveUseCaseProvider = Provider<ReceiveUseCase>((ref) {
+  return ReceiveUseCase(ref.read(walletRepositoryProvider));
+});
 
-  @override
-  FutureEither<Transaction> send({
-    required double amount,
-    required String recipientEmail,
-    String? description,
-  }) async {
-    final result = await _dioService.post(
-      '/transactions/send',
-      data: {
-        'amount': amount,
-        'recipientEmail': recipientEmail,
-        'description': description,
-      },
-    );
-    return result.fold(
-      (failure) => left(failure),
-      (response) {
-        final data = response.data as Map<String, dynamic>;
-        final transactionModel = TransactionModel.fromJson(data);
-        return right(transactionModel);
-      },
-    );
-  }
-
-  @override
-  FutureEither<Transaction> receive({
-    required double amount,
-    required String senderEmail,
-    String? description,
-  }) async {
-    final result = await _dioService.post(
-      '/transactions/receive',
-      data: {
-        'amount': amount,
-        'senderEmail': senderEmail,
-        'description': description,
-      },
-    );
-    return result.fold(
-      (failure) => left(failure),
-      (response) {
-        final data = response.data as Map<String, dynamic>;
-        final transactionModel = TransactionModel.fromJson(data);
-        return right(transactionModel);
-      },
-    );
-  }
-}
+final walletNotifierProvider = StateNotifierProvider<WalletNotifier, WalletState>((ref) {
+  return WalletNotifier(
+    getWalletUseCase: ref.read(getWalletUseCaseProvider),
+    getRecentTransactionsUseCase: ref.read(getRecentTransactionsUseCaseProvider),
+    depositUseCase: ref.read(depositUseCaseProvider),
+    withdrawUseCase: ref.read(withdrawUseCaseProvider),
+    sendUseCase: ref.read(sendUseCaseProvider),
+    receiveUseCase: ref.read(receiveUseCaseProvider),
+  );
+});
