@@ -1,51 +1,162 @@
-import 'package:flutter_clean_architecture/core/di/injection.dart';
-import 'package:flutter_clean_architecture/core/network/dio_service.dart';
-import 'package:flutter_clean_architecture/features/wallet/data/repositories/wallet_repository_impl.dart';
-import 'package:flutter_clean_architecture/features/wallet/domain/repositories/wallet_repository.dart';
-import 'package:flutter_clean_architecture/features/wallet/domain/usecases/deposit_usecase.dart';
-import 'package:flutter_clean_architecture/features/wallet/domain/usecases/get_recent_transactions_usecase.dart';
-import 'package:flutter_clean_architecture/features/wallet/domain/usecases/get_wallet_usecase.dart';
-import 'package:flutter_clean_architecture/features/wallet/domain/usecases/receive_usecase.dart';
-import 'package:flutter_clean_architecture/features/wallet/domain/usecases/send_usecase.dart';
-import 'package:flutter_clean_architecture/features/wallet/domain/usecases/withdraw_usecase.dart';
-import 'package:flutter_clean_architecture/features/wallet/presentation/providers/wallet_notifier.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:ztc_bank/src/imports/core_imports.dart';
+import 'package:ztc_bank/src/imports/packages_imports.dart';
+import 'package:ztc_bank/src/utils/utils.dart';
 
-final walletRepositoryProvider = Provider<WalletRepository>((ref) {
-  return WalletRepositoryImpl(DioService.instance);
-});
+import 'package:ztc_bank/src/features/wallet/domain/entities/wallet.dart';
+import 'package:ztc_bank/src/features/wallet/domain/entities/transaction.dart';
+import 'package:ztc_bank/src/features/wallet/domain/repositories/wallet_repository.dart';
+import 'package:ztc_bank/src/features/wallet/data/models/wallet_model.dart';
+import 'package:ztc_bank/src/features/wallet/data/models/transaction_model.dart';
 
-final getWalletUseCaseProvider = Provider<GetWalletUseCase>((ref) {
-  return GetWalletUseCase(ref.read(walletRepositoryProvider));
-});
+class WalletRepositoryImpl implements WalletRepository {
+  final DioService _dioService = DioService.instance;
 
-final getRecentTransactionsUseCaseProvider = Provider<GetRecentTransactionsUseCase>((ref) {
-  return GetRecentTransactionsUseCase(ref.read(walletRepositoryProvider));
-});
+  @override
+  FutureEither<Wallet> getWallet() async {
+    try {
+      final response = await _dioService.get('/wallet');
+      
+      if (response.statusCode == 200) {
+        final data = response.data as Map<String, dynamic>;
+        final wallet = WalletModel.fromJson(data);
+        return right(wallet);
+      }
+      
+      return left(ServerFailure('Failed to fetch wallet'));
+    } catch (e) {
+      return left(ServerFailure(e.toString()));
+    }
+  }
 
-final depositUseCaseProvider = Provider<DepositUseCase>((ref) {
-  return DepositUseCase(ref.read(walletRepositoryProvider));
-});
+  @override
+  FutureEither<List<Transaction>> getRecentTransactions({int limit = 10}) async {
+    try {
+      final response = await _dioService.get(
+        '/wallet/transactions',
+        queryParameters: {'limit': limit},
+      );
+      
+      if (response.statusCode == 200) {
+        final data = response.data as List<dynamic>;
+        final transactions = data
+            .map((json) => TransactionModel.fromJson(json as Map<String, dynamic>))
+            .toList();
+        return right(transactions);
+      }
+      
+      return left(ServerFailure('Failed to fetch transactions'));
+    } catch (e) {
+      return left(ServerFailure(e.toString()));
+    }
+  }
 
-final withdrawUseCaseProvider = Provider<WithdrawUseCase>((ref) {
-  return WithdrawUseCase(ref.read(walletRepositoryProvider));
-});
+  @override
+  FutureEither<Transaction> deposit({
+    required double amount,
+    required String description,
+  }) async {
+    try {
+      final response = await _dioService.post(
+        '/wallet/deposit',
+        data: {
+          'amount': amount,
+          'description': description,
+        },
+      );
+      
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final transaction = TransactionModel.fromJson(
+          response.data as Map<String, dynamic>,
+        );
+        return right(transaction);
+      }
+      
+      return left(ServerFailure('Deposit failed'));
+    } catch (e) {
+      return left(ServerFailure(e.toString()));
+    }
+  }
 
-final sendUseCaseProvider = Provider<SendUseCase>((ref) {
-  return SendUseCase(ref.read(walletRepositoryProvider));
-});
+  @override
+  FutureEither<Transaction> withdraw({
+    required double amount,
+    required String description,
+  }) async {
+    try {
+      final response = await _dioService.post(
+        '/wallet/withdraw',
+        data: {
+          'amount': amount,
+          'description': description,
+        },
+      );
+      
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final transaction = TransactionModel.fromJson(
+          response.data as Map<String, dynamic>,
+        );
+        return right(transaction);
+      }
+      
+      return left(ServerFailure('Withdrawal failed'));
+    } catch (e) {
+      return left(ServerFailure(e.toString()));
+    }
+  }
 
-final receiveUseCaseProvider = Provider<ReceiveUseCase>((ref) {
-  return ReceiveUseCase(ref.read(walletRepositoryProvider));
-});
+  @override
+  FutureEither<Transaction> send({
+    required double amount,
+    required String recipientEmail,
+    required String description,
+  }) async {
+    try {
+      final response = await _dioService.post(
+        '/wallet/send',
+        data: {
+          'amount': amount,
+          'recipientEmail': recipientEmail,
+          'description': description,
+        },
+      );
+      
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final transaction = TransactionModel.fromJson(
+          response.data as Map<String, dynamic>,
+        );
+        return right(transaction);
+      }
+      
+      return left(ServerFailure('Send failed'));
+    } catch (e) {
+      return left(ServerFailure(e.toString()));
+    }
+  }
 
-final walletNotifierProvider = StateNotifierProvider<WalletNotifier, WalletState>((ref) {
-  return WalletNotifier(
-    getWalletUseCase: ref.read(getWalletUseCaseProvider),
-    getRecentTransactionsUseCase: ref.read(getRecentTransactionsUseCaseProvider),
-    depositUseCase: ref.read(depositUseCaseProvider),
-    withdrawUseCase: ref.read(withdrawUseCaseProvider),
-    sendUseCase: ref.read(sendUseCaseProvider),
-    receiveUseCase: ref.read(receiveUseCaseProvider),
-  );
-});
+  @override
+  FutureEither<Transaction> receive({
+    required double amount,
+    required String description,
+  }) async {
+    try {
+      final response = await _dioService.post(
+        '/wallet/receive',
+        data: {
+          'amount': amount,
+          'description': description,
+        },
+      );
+      
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final transaction = TransactionModel.fromJson(
+          response.data as Map<String, dynamic>,
+        );
+        return right(transaction);
+      }
+      
+      return left(ServerFailure('Receive failed'));
+    } catch (e) {
+      return left(ServerFailure(e.toString()));
+    }
+  }
+}
