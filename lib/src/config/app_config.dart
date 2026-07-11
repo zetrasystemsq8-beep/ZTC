@@ -1,22 +1,23 @@
 import '../imports/core_imports.dart';
 import 'package:dio/dio.dart';
 import 'package:http/http.dart' as http;
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class AppConfig {
   AppConfig._();
+
   static late final Dio dio;
   static late final http.Client httpClient;
 
-  static String get baseUrl => _getBaseUrl();
+  // Temporary base URL until you add your backend.
+  static const String baseUrl = '';
 
   static Future<void> init() async {
     dio = Dio(
       BaseOptions(
-        baseUrl: _getBaseUrl(),
+        baseUrl: baseUrl,
         connectTimeout: const Duration(seconds: 30),
         receiveTimeout: const Duration(seconds: 30),
-        headers: {
+        headers: const {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
@@ -26,24 +27,26 @@ class AppConfig {
     dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) {
-          AppLogger.info('🌐 [DIO] REQUEST[${options.method}] => PATH: ${options.path}');
-          return handler.next(options);
+          AppLogger.info(
+            '🌐 [DIO] REQUEST[${options.method}] => PATH: ${options.path}',
+          );
+          handler.next(options);
         },
         onResponse: (response, handler) {
-          AppLogger.info('✅ [DIO] RESPONSE[${response.statusCode}] => PATH: ${response.requestOptions.path}');
-          return handler.next(response);
+          AppLogger.info(
+            '✅ [DIO] RESPONSE[${response.statusCode}] => PATH: ${response.requestOptions.path}',
+          );
+          handler.next(response);
         },
-        onError: (DioException e, handler) {
-          AppLogger.error('❌ [DIO] ERROR[${e.response?.statusCode}] => PATH: ${e.requestOptions.path}');
-          return handler.next(e);
+        onError: (e, handler) {
+          AppLogger.error(
+            '❌ [DIO] ERROR[${e.response?.statusCode}] => PATH: ${e.requestOptions.path}',
+          );
+          handler.next(e);
         },
       ),
     );
 
     httpClient = http.Client();
-  }
-
-  static String _getBaseUrl() {
-    return dotenv.get('API_BASE_URL', fallback: '');
   }
 }
