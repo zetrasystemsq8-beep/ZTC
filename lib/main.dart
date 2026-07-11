@@ -1,25 +1,13 @@
-import 'src/imports/core_imports.dart';
-import 'src/imports/packages_imports.dart';
-import 'src/app.dart';
+import 'package:flutter/material.dart';
 
-Future<void> main() async {
-  final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
-
-  FlutterNativeSplash.preserve(
-    widgetsBinding: widgetsBinding,
-  );
-
-  await EasyLocalization.ensureInitialized();
-  await AppConfig.init();
-  await HiveService.instance.init();
-
+void main() {
   runApp(
-    const LocalizationWrapper(
-      child: StateWrapper(
-        child: App(),
+    const MaterialApp(
+      home: Scaffold(
+        body: Center(
+          child: Text("ZTC is working"),
+        ),
       ),
     ),
   );
-
-  FlutterNativeSplash.remove();
 }
