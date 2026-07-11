@@ -129,7 +129,7 @@ class _StepIndicator extends StatelessWidget {
                 ),
                 child: Center(
                   child: isCompleted
-                      Icon(Icons.check, color: cs.onPrimary, size: 20.sp)
+                      ? Icon(Icons.check, color: cs.onPrimary, size: 20.sp)
                       : Text(
                           '${index + 1}',
                           style: TextStyle(
@@ -188,9 +188,9 @@ class _SelectRecipientStep extends StatelessWidget {
         RecipientSearchBar(
           onSearch: onSearch,
           onClear: () {
-  searchController.clear();
-  onSearch('');
-},
+            searchController.clear();
+            onSearch('');
+          },
         ),
         SizedBox(height: AppSpacing.lg.h),
         searchResults.when(
