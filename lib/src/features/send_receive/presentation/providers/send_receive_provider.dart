@@ -1,6 +1,6 @@
 import 'package:ztc_bank/src/imports/core_imports.dart';
 import 'package:ztc_bank/src/imports/packages_imports.dart';
-import 'package:ztc_bank/src/core/network/dio_service.dart';
+import 'package:ztc_bank/src/services/dio_service.dart';
 import 'package:ztc_bank/src/features/send_receive/domain/entities/user.dart';
 import 'package:ztc_bank/src/features/send_receive/domain/repositories/send_receive_repository.dart';
 import 'package:ztc_bank/src/features/send_receive/data/repositories/send_receive_repository_impl.dart';
@@ -8,7 +8,7 @@ import 'package:ztc_bank/src/features/wallet/domain/entities/transaction.dart';
 
 // Repository Provider
 final sendReceiveRepositoryProvider = Provider<SendReceiveRepository>((ref) {
-  return SendReceiveRepositoryImpl(DioService.instance);
+  return SendReceiveRepositoryImpl();
 });
 
 // Search Users Notifier
@@ -29,19 +29,24 @@ class SearchUsersNotifier extends StateNotifier<AsyncValue<List<User>>> {
     final result = await _repository.searchUsers(query: query);
 
     state = result.fold(
-      (failure) => AsyncValue<List<User>>.error(failure.message, StackTrace.current),
+      (failure) => AsyncValue<List<User>>.error(
+        failure.message,
+        StackTrace.current,
+      ),
       (users) => AsyncValue<List<User>>.data(users),
     );
   }
 }
 
-final searchUsersProvider = StateNotifierProvider<SearchUsersNotifier, AsyncValue<List<User>>>((ref) {
+final searchUsersProvider =
+    StateNotifierProvider<SearchUsersNotifier, AsyncValue<List<User>>>((ref) {
   final repository = ref.watch(sendReceiveRepositoryProvider);
   return SearchUsersNotifier(repository: repository);
 });
 
 // Recent Recipients Provider
-class RecentRecipientsNotifier extends StateNotifier<AsyncValue<List<User>>> {
+class RecentRecipientsNotifier
+    extends StateNotifier<AsyncValue<List<User>>> {
   final SendReceiveRepository _repository;
 
   RecentRecipientsNotifier({required SendReceiveRepository repository})
@@ -50,24 +55,31 @@ class RecentRecipientsNotifier extends StateNotifier<AsyncValue<List<User>>> {
 
   Future<void> fetchRecentRecipients() async {
     state = const AsyncValue.loading();
+
     final result = await _repository.getRecentRecipients();
 
     state = result.fold(
-      (failure) => AsyncValue<List<User>>.error(failure.message, StackTrace.current),
+      (failure) => AsyncValue<List<User>>.error(
+        failure.message,
+        StackTrace.current,
+      ),
       (users) => AsyncValue<List<User>>.data(users),
     );
   }
 }
 
-final recentRecipientsProvider = StateNotifierProvider<RecentRecipientsNotifier, AsyncValue<List<User>>>((ref) {
+final recentRecipientsProvider = StateNotifierProvider<
+    RecentRecipientsNotifier,
+    AsyncValue<List<User>>>((ref) {
   final repository = ref.watch(sendReceiveRepositoryProvider);
-  return RecentRecipientsNotifier(repository: repository)..fetchRecentRecipients();
+  return RecentRecipientsNotifier(repository: repository)
+    ..fetchRecentRecipients();
 });
 
-// Selected Recipient Provider
+// Selected Recipient
 final selectedRecipientProvider = StateProvider<User?>((ref) => null);
 
-// QR Code Provider
+// QR Code
 class QRCodeNotifier extends StateNotifier<AsyncValue<String>> {
   final SendReceiveRepository _repository;
 
@@ -77,35 +89,42 @@ class QRCodeNotifier extends StateNotifier<AsyncValue<String>> {
 
   Future<void> generateQRCode() async {
     state = const AsyncValue.loading();
+
     final result = await _repository.generateReceiveQRCode();
 
     state = result.fold(
-      (failure) => AsyncValue<String>.error(failure.message, StackTrace.current),
-      (qrCode) => AsyncValue<String>.data(qrCode),
+      (failure) =>
+          AsyncValue<String>.error(failure.message, StackTrace.current),
+      (qr) => AsyncValue<String>.data(qr),
     );
   }
 }
 
-final qrCodeProvider = StateNotifierProvider<QRCodeNotifier, AsyncValue<String>>((ref) {
+final qrCodeProvider =
+    StateNotifierProvider<QRCodeNotifier, AsyncValue<String>>((ref) {
   final repository = ref.watch(sendReceiveRepositoryProvider);
   return QRCodeNotifier(repository: repository)..generateQRCode();
 });
 
-// Transfer State
+// Transfer
 class TransferNotifier extends StateNotifier<AsyncValue<Transaction>> {
   final SendReceiveRepository _repository;
 
   TransferNotifier({required SendReceiveRepository repository})
       : _repository = repository,
-        super(const AsyncValue.data(Transaction(
-          id: '',
-          walletId: '',
-          amount: 0,
-          type: TransactionType.transfer,
-          status: TransactionStatus.pending,
-          description: '',
-          timestamp: DateTime.now(),
-        )));
+        super(
+          AsyncValue.data(
+            Transaction(
+              id: '',
+              walletId: '',
+              amount: 0,
+              type: TransactionType.transfer,
+              status: TransactionStatus.pending,
+              description: '',
+              timestamp: DateTime.now(),
+            ),
+          ),
+        );
 
   Future<void> processTransfer({
     required String recipientId,
@@ -113,6 +132,7 @@ class TransferNotifier extends StateNotifier<AsyncValue<Transaction>> {
     required String description,
   }) async {
     state = const AsyncValue.loading();
+
     final result = await _repository.transfer(
       recipientId: recipientId,
       amount: amount,
@@ -120,32 +140,40 @@ class TransferNotifier extends StateNotifier<AsyncValue<Transaction>> {
     );
 
     state = result.fold(
-      (failure) => AsyncValue<Transaction>.error(failure.message, StackTrace.current),
+      (failure) => AsyncValue<Transaction>.error(
+        failure.message,
+        StackTrace.current,
+      ),
       (transaction) => AsyncValue<Transaction>.data(transaction),
     );
   }
 }
 
-final transferProvider = StateNotifierProvider<TransferNotifier, AsyncValue<Transaction>>((ref) {
+final transferProvider =
+    StateNotifierProvider<TransferNotifier, AsyncValue<Transaction>>((ref) {
   final repository = ref.watch(sendReceiveRepositoryProvider);
   return TransferNotifier(repository: repository);
 });
 
-// Request Money State
+// Request Money
 class RequestMoneyNotifier extends StateNotifier<AsyncValue<Transaction>> {
   final SendReceiveRepository _repository;
 
   RequestMoneyNotifier({required SendReceiveRepository repository})
       : _repository = repository,
-        super(const AsyncValue.data(Transaction(
-          id: '',
-          walletId: '',
-          amount: 0,
-          type: TransactionType.transfer,
-          status: TransactionStatus.pending,
-          description: '',
-          timestamp: DateTime.now(),
-        )));
+        super(
+          AsyncValue.data(
+            Transaction(
+              id: '',
+              walletId: '',
+              amount: 0,
+              type: TransactionType.transfer,
+              status: TransactionStatus.pending,
+              description: '',
+              timestamp: DateTime.now(),
+            ),
+          ),
+        );
 
   Future<void> requestMoney({
     required String senderEmail,
@@ -153,6 +181,7 @@ class RequestMoneyNotifier extends StateNotifier<AsyncValue<Transaction>> {
     required String description,
   }) async {
     state = const AsyncValue.loading();
+
     final result = await _repository.requestMoney(
       senderEmail: senderEmail,
       amount: amount,
@@ -160,13 +189,17 @@ class RequestMoneyNotifier extends StateNotifier<AsyncValue<Transaction>> {
     );
 
     state = result.fold(
-      (failure) => AsyncValue<Transaction>.error(failure.message, StackTrace.current),
+      (failure) => AsyncValue<Transaction>.error(
+        failure.message,
+        StackTrace.current,
+      ),
       (transaction) => AsyncValue<Transaction>.data(transaction),
     );
   }
 }
 
-final requestMoneyProvider = StateNotifierProvider<RequestMoneyNotifier, AsyncValue<Transaction>>((ref) {
+final requestMoneyProvider =
+    StateNotifierProvider<RequestMoneyNotifier, AsyncValue<Transaction>>((ref) {
   final repository = ref.watch(sendReceiveRepositoryProvider);
   return RequestMoneyNotifier(repository: repository);
 });
