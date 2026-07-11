@@ -48,16 +48,31 @@ class TransactionFilter extends Equatable {
     );
   }
 
+  /// Converts this filter into query parameters for Dio.
+  Map<String, dynamic> toJson() {
+    return {
+      if (searchQuery != null) 'q': searchQuery,
+      if (type != null) 'type': type!.name,
+      if (status != null) 'status': status!.name,
+      if (startDate != null) 'startDate': startDate!.toIso8601String(),
+      if (endDate != null) 'endDate': endDate!.toIso8601String(),
+      if (minAmount != null) 'minAmount': minAmount,
+      if (maxAmount != null) 'maxAmount': maxAmount,
+      'limit': limit,
+      'offset': offset,
+    };
+  }
+
   @override
   List<Object?> get props => [
-    searchQuery,
-    type,
-    status,
-    startDate,
-    endDate,
-    minAmount,
-    maxAmount,
-    limit,
-    offset,
-  ];
+        searchQuery,
+        type,
+        status,
+        startDate,
+        endDate,
+        minAmount,
+        maxAmount,
+        limit,
+        offset,
+      ];
 }
