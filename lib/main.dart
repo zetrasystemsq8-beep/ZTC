@@ -24,8 +24,11 @@ Future<void> main() async {
   FlutterNativeSplash.remove();
 
   runApp(
-    const LocalizationWrapper(
-      child: StateWrapper(
+    EasyLocalization(
+      supportedLocales: const [Locale('en')],
+      path: 'assets/translations',
+      fallbackLocale: const Locale('en'),
+      child: const StateWrapper(
         child: App(),
       ),
     ),
