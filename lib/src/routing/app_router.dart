@@ -14,10 +14,12 @@ import 'package:ztc_bank/src/features/transactions/presentation/screens/transact
 import 'package:ztc_bank/src/features/send_receive/presentation/screens/send_money_screen.dart';
 import 'package:ztc_bank/src/features/send_receive/presentation/screens/receive_money_screen.dart';
 
-
 final GoRouter appRouter = GoRouter(
   navigatorKey: rootNavigatorKey,
-  initialLocation: AppRoutes.onboarding,
+
+  // Developer mode: skip onboarding/login and open Home directly.
+  initialLocation: AppRoutes.home,
+
   routes: <RouteBase>[
     GoRoute(
       path: AppRoutes.onboarding,
@@ -50,17 +52,17 @@ final GoRouter appRouter = GoRouter(
       builder: (context, state) => const WalletHome(),
     ),
     GoRoute(
+      path: AppRoutes.transactions,
+      name: 'transactions',
+      builder: (context, state) => const TransactionsListScreen(),
+    ),
+    GoRoute(
       path: '${AppRoutes.transactions}/:id',
       name: 'transactionDetail',
       builder: (context, state) {
         final id = state.pathParameters['id']!;
         return TransactionDetailScreen(transactionId: id);
       },
-    ),
-    GoRoute(
-      path: AppRoutes.transactions,
-      name: 'transactions',
-      builder: (context, state) => const TransactionsListScreen(),
     ),
     GoRoute(
       path: AppRoutes.sendMoney,
