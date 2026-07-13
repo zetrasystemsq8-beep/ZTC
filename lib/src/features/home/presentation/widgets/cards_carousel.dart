@@ -75,7 +75,7 @@ class _BankCardTile extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
           borderRadius: AppBorders.lg,
-          child: Inj(
+          child: Container(
             padding: EdgeInsets.all(AppSpacing.md.w),
             decoration: BoxDecoration(
               borderRadius: AppBorders.lg,
