@@ -4,11 +4,18 @@ import 'package:ztc_bank/src/imports/packages_imports.dart';
 import 'package:ztc_bank/src/features/wallet/domain/repositories/wallet_repository.dart';
 import 'package:ztc_bank/src/features/wallet/domain/entities/wallet.dart';
 import 'package:ztc_bank/src/features/wallet/domain/entities/transaction.dart';
-import 'package:ztc_bank/src/features/wallet/data/repositories/wallet_repository_impl.dart';
+import 'package:ztc_bank/src/features/wallet/data/repositories/wallet_repository_mock.dart';
 
 // Repository Provider
+//
+// The backend (Rust API / Firebase) is not implemented yet. We bind the
+// wallet repository to an in-memory mock so the dashboard renders with
+// realistic demo data instead of an error screen. To switch to the real
+// backend later, override this provider with `WalletRepositoryImpl()`
+// (which talks to Dio) or any future implementation — no other change
+// required.
 final walletRepositoryProvider = Provider<WalletRepository>((ref) {
-  return WalletRepositoryImpl();
+  return WalletRepositoryMock();
 });
 
 // Wallet State Notifier
@@ -21,9 +28,9 @@ class WalletNotifier extends StateNotifier<AsyncValue<Wallet>> {
 
   Future<void> fetchWallet() async {
     state = const AsyncValue.loading();
-    
+
     final result = await _repository.getWallet();
-    
+
     state = result.fold(
       (failure) => AsyncValue.error(failure.message, StackTrace.current),
       (wallet) => AsyncValue.data(wallet),
@@ -35,13 +42,12 @@ class WalletNotifier extends StateNotifier<AsyncValue<Wallet>> {
       amount: amount,
       description: description,
     );
-    
+
     result.fold(
       (failure) {
         // Error handling
       },
       (transaction) {
-        // Refresh wallet after transaction
         fetchWallet();
       },
     );
@@ -52,13 +58,12 @@ class WalletNotifier extends StateNotifier<AsyncValue<Wallet>> {
       amount: amount,
       description: description,
     );
-    
+
     result.fold(
       (failure) {
         // Error handling
       },
       (transaction) {
-        // Refresh wallet after transaction
         fetchWallet();
       },
     );
@@ -70,13 +75,12 @@ class WalletNotifier extends StateNotifier<AsyncValue<Wallet>> {
       recipientEmail: recipientEmail,
       description: description,
     );
-    
+
     result.fold(
       (failure) {
         // Error handling
       },
       (transaction) {
-        // Refresh wallet after transaction
         fetchWallet();
       },
     );
@@ -87,13 +91,12 @@ class WalletNotifier extends StateNotifier<AsyncValue<Wallet>> {
       amount: amount,
       description: description,
     );
-    
+
     result.fold(
       (failure) {
         // Error handling
       },
       (transaction) {
-        // Refresh wallet after transaction
         fetchWallet();
       },
     );
@@ -116,9 +119,9 @@ class TransactionsNotifier extends StateNotifier<AsyncValue<List<Transaction>>> 
 
   Future<void> fetchTransactions({int limit = 10}) async {
     state = const AsyncValue.loading();
-    
+
     final result = await _repository.getRecentTransactions(limit: limit);
-    
+
     state = result.fold(
       (failure) => AsyncValue.error(failure.message, StackTrace.current),
       (transactions) => AsyncValue.data(transactions),
