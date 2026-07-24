@@ -5,31 +5,42 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'src/imports/core_imports.dart';
+import 'src/imports/packages_imports.dart';
 import 'src/app.dart';
 
 Future<void> main() async {
-  final binding = WidgetsFlutterBinding.ensureInitialized();
-  FlutterNativeSplash.preserve(widgetsBinding: binding);
+  final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
+  FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
 
-  await EasyLocalization.ensureInitialized();
-  await dotenv.load(fileName: ".env");
+  try {
+    await EasyLocalization.ensureInitialized();
 
-  await Supabase.initialize(
-    url: dotenv.env["SUPABASE_URL"]!,
-    anonKey: dotenv.env["SUPABASE_ANON_KEY"]!,
-  );
+    await dotenv.load(fileName: '.env');
 
-  await AppConfig.init();
-  await HiveService.instance.init();
+    await Supabase.initialize(
+      url: dotenv.env['SUPABASE_URL']!,
+      anonKey: dotenv.env['SUPABASE_ANON_KEY']!,
+    );
+
+    await AppConfig.init();
+    await HiveService.instance.init();
+  } catch (e, s) {
+    debugPrint('Startup Error: $e');
+    debugPrintStack(stackTrace: s);
+  }
 
   FlutterNativeSplash.remove();
 
   runApp(
     EasyLocalization(
-      supportedLocales: const [Locale("en")],
-      path: "assets/translations",
-      fallbackLocale: const Locale("en"),
-      child: const StateWrapper(child: App()),
+      supportedLocales: const [
+        Locale('en'),
+      ],
+      path: 'assets/translations',
+      fallbackLocale: const Locale('en'),
+      child: const StateWrapper(
+        child: App(),
+      ),
     ),
   );
 }
