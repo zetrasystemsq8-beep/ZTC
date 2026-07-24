@@ -11,6 +11,9 @@ dependencies:
     sdk: flutter
   cupertino_icons: ^1.0.8
 
+  # Backend
+  supabase_flutter: ^2.10.3
+
   # Navigation
   go_router: ^17.1.0
 
@@ -72,6 +75,7 @@ dependencies:
   # Localization
   easy_localization: ^3.0.8
 
+  # Splash Screen
   flutter_native_splash: ^2.4.7
 
 dev_dependencies:
@@ -92,3 +96,4 @@ flutter:
 
   assets:
     - assets/translations/
+    - .env
