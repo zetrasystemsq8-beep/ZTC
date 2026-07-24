@@ -1,5 +1,6 @@
 import '../imports/core_imports.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
 class AppConfig {
@@ -8,18 +9,26 @@ class AppConfig {
   static late final Dio dio;
   static late final http.Client httpClient;
 
-  // Temporary base URL until you add your backend.
-  static const String baseUrl = '';
+  // Supabase configuration
+  static String get supabaseUrl => dotenv.get('SUPABASE_URL', fallback: '');
+  static String get supabaseAnonKey => dotenv.get('SUPABASE_ANON_KEY', fallback: '');
+
+  static late final String baseUrl;
 
   static Future<void> init() async {
+    baseUrl = '$supabaseUrl/rest/v1';
+
     dio = Dio(
       BaseOptions(
         baseUrl: baseUrl,
         connectTimeout: const Duration(seconds: 30),
         receiveTimeout: const Duration(seconds: 30),
-        headers: const {
+        headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
+          'Authorization': 'Bearer $supabaseAnonKey',
+          'apikey': supabaseAnonKey,
+          'Prefer': 'return=representation',
         },
       ),
     );
