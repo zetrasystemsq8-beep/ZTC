@@ -43,12 +43,10 @@ GoRouter buildRouter(WidgetRef ref) {
           state.matchedLocation == AppRoutes.signup ||
           state.matchedLocation == AppRoutes.forgotPassword;
 
-      // If not authenticated and not on auth routes, go to login
       if (!isAuthenticated && !isLoggingIn) {
         return AppRoutes.login;
       }
 
-      // If authenticated and on auth routes, go to home
       if (isAuthenticated && isLoggingIn) {
         return AppRoutes.home;
       }
@@ -56,14 +54,12 @@ GoRouter buildRouter(WidgetRef ref) {
       return null;
     },
     routes: <RouteBase>[
-      // Onboarding
       GoRoute(
         path: AppRoutes.onboarding,
         name: 'onboarding',
         builder: (context, state) => const OnboardingPage(),
       ),
 
-      // Authentication
       GoRoute(
         path: AppRoutes.login,
         name: 'login',
@@ -82,21 +78,18 @@ GoRouter buildRouter(WidgetRef ref) {
         builder: (context, state) => const ForgotPasswordScreen(),
       ),
 
-      // Home
       GoRoute(
         path: AppRoutes.home,
         name: 'home',
         builder: (context, state) => const HomePage(),
       ),
 
-      // Wallet
       GoRoute(
         path: AppRoutes.wallet,
         name: 'wallet',
         builder: (context, state) => const WalletHome(),
       ),
 
-      // Transactions
       GoRoute(
         path: AppRoutes.transactions,
         name: 'transactions',
@@ -112,7 +105,6 @@ GoRouter buildRouter(WidgetRef ref) {
         },
       ),
 
-      // Send / Receive
       GoRoute(
         path: AppRoutes.sendMoney,
         name: 'sendMoney',
@@ -125,21 +117,18 @@ GoRouter buildRouter(WidgetRef ref) {
         builder: (context, state) => const ReceiveMoneyScreen(),
       ),
 
-      // Payments Hub
       GoRoute(
         path: AppRoutes.payments,
         name: 'payments',
         builder: (context, state) => const PaymentsScreen(),
       ),
 
-      // Cards & Rewards Hub
       GoRoute(
         path: AppRoutes.cards,
         name: 'cards',
         builder: (context, state) => const CardsScreen(),
       ),
 
-      // Account Hub
       GoRoute(
         path: AppRoutes.account,
         name: 'account',
