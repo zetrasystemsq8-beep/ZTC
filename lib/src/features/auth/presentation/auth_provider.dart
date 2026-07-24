@@ -44,10 +44,16 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
     state = const AsyncValue.loading();
 
     try {
-      await SupabaseService.signUp(
+      final response = await SupabaseService.signUp(
         email: email,
         password: password,
       );
+
+      // Create wallet for new user
+      final userId = response.user?.id;
+      if (userId != null) {
+        await SupabaseService.createWallet(userId);
+      }
 
       state = AsyncValue.data(
         SupabaseService.currentUser,
