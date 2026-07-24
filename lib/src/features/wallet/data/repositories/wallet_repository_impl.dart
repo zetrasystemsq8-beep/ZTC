@@ -1,5 +1,4 @@
 import 'package:ztc_bank/src/imports/core_imports.dart';
-import 'package:ztc_bank/src/imports/packages_imports.dart';
 import 'package:ztc_bank/src/utils/utils.dart';
 
 import 'package:ztc_bank/src/features/wallet/domain/entities/wallet.dart';
@@ -13,12 +12,15 @@ class WalletRepositoryImpl implements WalletRepository {
 
   @override
   FutureEither<Wallet> getWallet() async {
-    final result = await _dioService.get('/wallet');
+    final result = await _dioService.get(
+      '/rest/v1/wallets',
+      queryParameters: {'select': '*'},
+    );
 
     return result.fold(
       (failure) => left(failure),
       (response) {
-        final data = response.data as Map<String, dynamic>;
+        final data = (response.data as List).first as Map<String, dynamic>;
         final wallet = WalletModel.fromJson(data);
         return right(wallet);
       },
@@ -28,8 +30,12 @@ class WalletRepositoryImpl implements WalletRepository {
   @override
   FutureEither<List<Transaction>> getRecentTransactions({int limit = 10}) async {
     final result = await _dioService.get(
-      '/wallet/transactions',
-      queryParameters: {'limit': limit},
+      '/rest/v1/transactions',
+      queryParameters: {
+        'select': '*',
+        'order': 'created_at.desc',
+        'limit': limit,
+      },
     );
 
     return result.fold(
@@ -50,10 +56,14 @@ class WalletRepositoryImpl implements WalletRepository {
     required String description,
   }) async {
     final result = await _dioService.post(
-      '/wallet/deposit',
+      '/rest/v1/transactions',
       data: {
+        'wallet_id': 'get_current_wallet_id', // needs to be dynamic
+        'user_id': 'auth.uid()',
         'amount': amount,
+        'type': 'credit',
         'description': description,
+        'status': 'completed',
       },
     );
 
@@ -74,10 +84,14 @@ class WalletRepositoryImpl implements WalletRepository {
     required String description,
   }) async {
     final result = await _dioService.post(
-      '/wallet/withdraw',
+      '/rest/v1/transactions',
       data: {
+        'wallet_id': 'get_current_wallet_id',
+        'user_id': 'auth.uid()',
         'amount': amount,
+        'type': 'debit',
         'description': description,
+        'status': 'completed',
       },
     );
 
@@ -99,11 +113,15 @@ class WalletRepositoryImpl implements WalletRepository {
     required String description,
   }) async {
     final result = await _dioService.post(
-      '/wallet/send',
+      '/rest/v1/transactions',
       data: {
+        'wallet_id': 'get_current_wallet_id',
+        'user_id': 'auth.uid()',
         'amount': amount,
-        'recipientEmail': recipientEmail,
+        'type': 'transfer',
         'description': description,
+        'recipient_email': recipientEmail,
+        'status': 'completed',
       },
     );
 
@@ -124,10 +142,14 @@ class WalletRepositoryImpl implements WalletRepository {
     required String description,
   }) async {
     final result = await _dioService.post(
-      '/wallet/receive',
+      '/rest/v1/transactions',
       data: {
+        'wallet_id': 'get_current_wallet_id',
+        'user_id': 'auth.uid()',
         'amount': amount,
+        'type': 'credit',
         'description': description,
+        'status': 'completed',
       },
     );
 
