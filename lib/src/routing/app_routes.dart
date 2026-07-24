@@ -3,17 +3,35 @@
 /// Use these variables instead of raw strings throughout the app.
 /// Example:
 /// context.go(AppRoutes.onboarding);
+
 abstract final class AppRoutes {
   AppRoutes._();
 
   static const String splash = '/splash';
+
   static const String home = '/';
+
   static const String onboarding = '/onboarding';
+
   static const String login = '/login';
+
   static const String signup = '/signup';
+
   static const String forgotPassword = '/forgot-password';
+
   static const String wallet = '/wallet';
+
   static const String transactions = '/transactions';
+
   static const String sendMoney = '/send';
+
   static const String receiveMoney = '/receive';
+
+  // Grouped feature hubs
+
+  static const String payments = '/payments';
+
+  static const String cards = '/cards';
+
+  static const String account = '/account';
 }
