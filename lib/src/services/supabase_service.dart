@@ -38,4 +38,17 @@ class SupabaseService {
   static Future<void> resetPassword(String email) {
     return auth.resetPasswordForEmail(email);
   }
+
+  /// Create a wallet for a new user (CP currency, 0 balance)
+  static Future<void> createWallet(String userId) async {
+    await client
+        .from('wallets')
+        .insert({
+          'user_id': userId,
+          'balance': 0.00,
+          'currency': 'CP',
+          'created_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+        });
+  }
 }
