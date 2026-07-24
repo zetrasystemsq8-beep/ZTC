@@ -1,7 +1,9 @@
 import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:ztc_bank/src/routing/global_navigator.dart';
 import 'package:ztc_bank/src/routing/app_routes.dart';
+import 'package:ztc_bank/src/features/auth/presentation/providers/auth_provider.dart';
 
 // Auth
 import 'package:ztc_bank/src/features/auth/presentation/screens/login_screen.dart';
@@ -29,126 +31,119 @@ import 'package:ztc_bank/src/features/cards/presentation/screens/cards_screen.da
 import 'package:ztc_bank/src/features/account/presentation/screens/account_screen.dart';
 
 
-final GoRouter appRouter = GoRouter(
-  navigatorKey: rootNavigatorKey,
+GoRouter buildRouter(WidgetRef ref) {
+  return GoRouter(
+    navigatorKey: rootNavigatorKey,
+    initialLocation: AppRoutes.login,
+    redirect: (context, state) {
+      final authState = ref.watch(authProvider);
+      final isAuthenticated = authState.whenData((user) => user != null).value ?? false;
+      final isLoggingIn = state.matchedLocation == AppRoutes.login ||
+          state.matchedLocation == AppRoutes.signup ||
+          state.matchedLocation == AppRoutes.forgotPassword;
 
-  // Developer mode
-  // Skip onboarding/login for now
-  initialLocation: AppRoutes.home,
+      // If not authenticated and not on auth routes, go to login
+      if (!isAuthenticated && !isLoggingIn) {
+        return AppRoutes.login;
+      }
 
-  routes: <RouteBase>[
+      // If authenticated and on auth routes, go to home
+      if (isAuthenticated && isLoggingIn) {
+        return AppRoutes.home;
+      }
 
-    // Onboarding
-    GoRoute(
-      path: AppRoutes.onboarding,
-      name: 'onboarding',
-      builder: (context, state) =>
-          const OnboardingPage(),
-    ),
+      return null;
+    },
+    routes: <RouteBase>[
+      // Onboarding
+      GoRoute(
+        path: AppRoutes.onboarding,
+        name: 'onboarding',
+        builder: (context, state) => const OnboardingPage(),
+      ),
 
+      // Authentication
+      GoRoute(
+        path: AppRoutes.login,
+        name: 'login',
+        builder: (context, state) => const LoginScreen(),
+      ),
 
-    // Authentication
-    GoRoute(
-      path: AppRoutes.login,
-      name: 'login',
-      builder: (context, state) =>
-          const LoginScreen(),
-    ),
+      GoRoute(
+        path: AppRoutes.signup,
+        name: 'signup',
+        builder: (context, state) => const SignupScreen(),
+      ),
 
-    GoRoute(
-      path: AppRoutes.signup,
-      name: 'signup',
-      builder: (context, state) =>
-          const SignupScreen(),
-    ),
+      GoRoute(
+        path: AppRoutes.forgotPassword,
+        name: 'forgotPassword',
+        builder: (context, state) => const ForgotPasswordScreen(),
+      ),
 
-    GoRoute(
-      path: AppRoutes.forgotPassword,
-      name: 'forgotPassword',
-      builder: (context, state) =>
-          const ForgotPasswordScreen(),
-    ),
+      // Home
+      GoRoute(
+        path: AppRoutes.home,
+        name: 'home',
+        builder: (context, state) => const HomePage(),
+      ),
 
+      // Wallet
+      GoRoute(
+        path: AppRoutes.wallet,
+        name: 'wallet',
+        builder: (context, state) => const WalletHome(),
+      ),
 
-    // Home
-    GoRoute(
-      path: AppRoutes.home,
-      name: 'home',
-      builder: (context, state) =>
-          const HomePage(),
-    ),
+      // Transactions
+      GoRoute(
+        path: AppRoutes.transactions,
+        name: 'transactions',
+        builder: (context, state) => const TransactionsListScreen(),
+      ),
 
+      GoRoute(
+        path: '${AppRoutes.transactions}/:id',
+        name: 'transactionDetail',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return TransactionDetailScreen(transactionId: id);
+        },
+      ),
 
-    // Wallet
-    GoRoute(
-      path: AppRoutes.wallet,
-      name: 'wallet',
-      builder: (context, state) =>
-          const WalletHome(),
-    ),
+      // Send / Receive
+      GoRoute(
+        path: AppRoutes.sendMoney,
+        name: 'sendMoney',
+        builder: (context, state) => const SendMoneyScreen(),
+      ),
 
+      GoRoute(
+        path: AppRoutes.receiveMoney,
+        name: 'receiveMoney',
+        builder: (context, state) => const ReceiveMoneyScreen(),
+      ),
 
-    // Transactions
-    GoRoute(
-      path: AppRoutes.transactions,
-      name: 'transactions',
-      builder: (context, state) =>
-          const TransactionsListScreen(),
-    ),
+      // Payments Hub
+      GoRoute(
+        path: AppRoutes.payments,
+        name: 'payments',
+        builder: (context, state) => const PaymentsScreen(),
+      ),
 
-    GoRoute(
-      path: '${AppRoutes.transactions}/:id',
-      name: 'transactionDetail',
-      builder: (context, state) {
-        final id = state.pathParameters['id']!;
+      // Cards & Rewards Hub
+      GoRoute(
+        path: AppRoutes.cards,
+        name: 'cards',
+        builder: (context, state) => const CardsScreen(),
+      ),
 
-        return TransactionDetailScreen(
-          transactionId: id,
-        );
-      },
-    ),
-
-
-    // Send / Receive
-    GoRoute(
-      path: AppRoutes.sendMoney,
-      name: 'sendMoney',
-      builder: (context, state) =>
-          const SendMoneyScreen(),
-    ),
-
-    GoRoute(
-      path: AppRoutes.receiveMoney,
-      name: 'receiveMoney',
-      builder: (context, state) =>
-          const ReceiveMoneyScreen(),
-    ),
-
-
-    // Payments Hub
-    GoRoute(
-      path: AppRoutes.payments,
-      name: 'payments',
-      builder: (context, state) =>
-          const PaymentsScreen(),
-    ),
-
-
-    // Cards & Rewards Hub
-    GoRoute(
-      path: AppRoutes.cards,
-      name: 'cards',
-      builder: (context, state) =>
-          const CardsScreen(),
-    ),
-
-
-    // Account Hub
-    GoRoute(
-      path: AppRoutes.account,
-      name: 'account',
-      builder: (context, state) =>
-          const AccountScreen(),
-    ),
-  ],
-);
+      // Account Hub
+      GoRoute(
+        path: AppRoutes.account,
+        name: 'account',
+        builder: (context, state) => const AccountScreen(),
+      ),
+    ],
+  );
+}
