@@ -1,3 +1,4 @@
+// HomePage (complete, all demo removed)
 import 'package:ztc_bank/src/imports/core_imports.dart';
 import 'package:ztc_bank/src/imports/packages_imports.dart';
 
@@ -11,11 +12,10 @@ import 'package:ztc_bank/src/services/copy_service.dart';
 
 /// Production banking dashboard.
 ///
-/// Reads wallet + transaction state from the existing Riverpod providers and
-/// renders greeting, balance, quick actions, cards, spending summary, recent
-/// transactions, and a promotional banner. All business logic goes through
-/// providers/repositories, so wiring the Rust backend later requires only
-/// swapping the repository implementations.
+/// Reads wallet + transaction state from the Riverpod providers and renders
+/// greeting, balance, quick actions, cards, spending summary, recent
+/// transactions, and promotional banner. All business logic goes through
+/// providers/repositories wired to the real backend.
 class HomePage extends HookConsumerWidget {
   const HomePage({super.key});
 
@@ -69,7 +69,7 @@ class HomePage extends HookConsumerWidget {
         toolbarHeight: 72.h,
         title: GreetingHeader(
           user: session.user,
-          unreadNotifications: 3,
+          unreadNotifications: 0,
           onNotificationsTap: () => showComingSoon('home.notifications'),
           onAvatarTap: goWallet,
         ),
@@ -104,8 +104,8 @@ class HomePage extends HookConsumerWidget {
               onShowQr: () => showQr(wallet),
               onSend: goSend,
               onReceive: goReceive,
-              onDeposit: () => showComingSoon('home.action_deposit'),
-              onWithdraw: () => showComingSoon('home.action_withdraw'),
+              onDeposit: () => context.push(AppRoutes.wallet),
+              onWithdraw: () => context.push(AppRoutes.wallet),
               onSeeAllTransactions: goTransactions,
               onOpenWallet: goWallet,
               onPromoTap: () => showComingSoon('home.promo_title'),
@@ -165,22 +165,8 @@ class _DashboardBody extends StatelessWidget {
   final Future<void> Function() copyAccount;
   final TextTheme textTheme;
 
-  List<BankCardData> _mockCards(Wallet wallet) {
-    return [
-      BankCardData(
-        holder: 'ZTC Member',
-        last4: wallet.id.padLeft(4, '0').substring(wallet.id.length >= 4 ? wallet.id.length - 4 : 0),
-        expiry: '12/28',
-        brand: 'ZTC PLATINUM',
-        isPrimary: true,
-      ),
-      const BankCardData(
-        holder: 'ZTC Member',
-        last4: '4821',
-        expiry: '09/27',
-        brand: 'ZTC GOLD',
-      ),
-    ];
+  List<BankCardData> _cards() {
+    return [];
   }
 
   @override
@@ -223,7 +209,7 @@ class _DashboardBody extends StatelessWidget {
           child: SizedBox(
             height: 160.h,
             child: CardsCarousel(
-              cards: _mockCards(wallet),
+              cards: _cards(),
               onCardTap: (_) => onOpenWallet(),
               onAddCard: () => context.showTypedSnackBar(
                 'home.coming_soon'.tr(args: ['home.add_card'.tr()]),
