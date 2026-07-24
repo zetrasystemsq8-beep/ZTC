@@ -1,12 +1,15 @@
 // lib/src/routing/app_router.dart
-import 'package:go_router/go_router.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import 'package:ztc_bank/src/routing/global_navigator.dart';
 import 'package:ztc_bank/src/routing/app_routes.dart';
-import 'package:ztc_bank/src/features/auth/presentation/providers/auth_provider.dart';
 
-// Auth
+// Auth Provider
+import 'package:ztc_bank/src/features/auth/presentation/providers/session_provider.dart';
+
+// Auth Screens
 import 'package:ztc_bank/src/features/auth/presentation/screens/login_screen.dart';
 import 'package:ztc_bank/src/features/auth/presentation/screens/signup_screen.dart';
 import 'package:ztc_bank/src/features/auth/presentation/screens/forgot_password_screen.dart';
@@ -22,74 +25,100 @@ import 'package:ztc_bank/src/features/wallet/presentation/screens/wallet_home.da
 import 'package:ztc_bank/src/features/transactions/presentation/screens/transactions_list_screen.dart';
 import 'package:ztc_bank/src/features/transactions/presentation/screens/transaction_detail_screen.dart';
 
-// Send Receive
+// Send / Receive
 import 'package:ztc_bank/src/features/send_receive/presentation/screens/send_money_screen.dart';
 import 'package:ztc_bank/src/features/send_receive/presentation/screens/receive_money_screen.dart';
 
-// New grouped features
+// Payments
 import 'package:ztc_bank/src/features/payments/presentation/screens/payments_screen.dart';
-import 'package:ztc_bank/src/features/cards/presentation/screens/cards_screen.dart';
-import 'package:ztc_bank/src/features/account/presentation/screens/account_screen.dart';
 
+// Cards
+import 'package:ztc_bank/src/features/cards/presentation/screens/cards_screen.dart';
+
+// Account
+import 'package:ztc_bank/src/features/account/presentation/screens/account_screen.dart';
 
 GoRouter buildRouter(WidgetRef ref) {
   return GoRouter(
     navigatorKey: rootNavigatorKey,
     initialLocation: AppRoutes.login,
+
     redirect: (context, state) {
-      final authState = ref.watch(authProvider);
-      final isAuthenticated = authState.whenData((user) => user != null).value ?? false;
-      final isLoggingIn = state.matchedLocation == AppRoutes.login ||
+      final session = ref.watch(sessionProvider);
+
+      final isAuthenticated =
+          session.status == SessionStatus.authenticated;
+
+      final isLoading =
+          session.status == SessionStatus.unknown;
+
+      final isAuthRoute =
+          state.matchedLocation == AppRoutes.login ||
           state.matchedLocation == AppRoutes.signup ||
           state.matchedLocation == AppRoutes.forgotPassword;
 
-      if (!isAuthenticated && !isLoggingIn) {
+      // Wait until the auth state has been determined.
+      if (isLoading) {
+        return null;
+      }
+
+      // Not logged in -> Login
+      if (!isAuthenticated && !isAuthRoute) {
         return AppRoutes.login;
       }
 
-      if (isAuthenticated && isLoggingIn) {
+      // Logged in -> Home
+      if (isAuthenticated && isAuthRoute) {
         return AppRoutes.home;
       }
 
       return null;
     },
-    routes: <RouteBase>[
+
+    routes: [
+      // Onboarding
       GoRoute(
         path: AppRoutes.onboarding,
         name: 'onboarding',
         builder: (context, state) => const OnboardingPage(),
       ),
 
+      // Login
       GoRoute(
         path: AppRoutes.login,
         name: 'login',
         builder: (context, state) => const LoginScreen(),
       ),
 
+      // Signup
       GoRoute(
         path: AppRoutes.signup,
         name: 'signup',
         builder: (context, state) => const SignupScreen(),
       ),
 
+      // Forgot Password
       GoRoute(
         path: AppRoutes.forgotPassword,
         name: 'forgotPassword',
         builder: (context, state) => const ForgotPasswordScreen(),
       ),
 
+      // Home
       GoRoute(
         path: AppRoutes.home,
         name: 'home',
         builder: (context, state) => const HomePage(),
       ),
 
+      // Wallet
       GoRoute(
         path: AppRoutes.wallet,
         name: 'wallet',
         builder: (context, state) => const WalletHome(),
       ),
 
+      // Transactions
       GoRoute(
         path: AppRoutes.transactions,
         name: 'transactions',
@@ -105,30 +134,35 @@ GoRouter buildRouter(WidgetRef ref) {
         },
       ),
 
+      // Send Money
       GoRoute(
         path: AppRoutes.sendMoney,
         name: 'sendMoney',
         builder: (context, state) => const SendMoneyScreen(),
       ),
 
+      // Receive Money
       GoRoute(
         path: AppRoutes.receiveMoney,
         name: 'receiveMoney',
         builder: (context, state) => const ReceiveMoneyScreen(),
       ),
 
+      // Payments
       GoRoute(
         path: AppRoutes.payments,
         name: 'payments',
         builder: (context, state) => const PaymentsScreen(),
       ),
 
+      // Cards
       GoRoute(
         path: AppRoutes.cards,
         name: 'cards',
         builder: (context, state) => const CardsScreen(),
       ),
 
+      // Account
       GoRoute(
         path: AppRoutes.account,
         name: 'account',
