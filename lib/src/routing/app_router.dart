@@ -3,21 +3,27 @@ import 'package:go_router/go_router.dart';
 import 'package:ztc_bank/src/routing/global_navigator.dart';
 import 'package:ztc_bank/src/routing/app_routes.dart';
 
+// Auth
 import 'package:ztc_bank/src/features/auth/presentation/screens/login_screen.dart';
 import 'package:ztc_bank/src/features/auth/presentation/screens/signup_screen.dart';
 import 'package:ztc_bank/src/features/auth/presentation/screens/forgot_password_screen.dart';
 
+// Core
 import 'package:ztc_bank/src/features/home/presentation/screens/home_page.dart';
 import 'package:ztc_bank/src/features/onboarding/presentation/screens/onboarding_page.dart';
 
+// Wallet
 import 'package:ztc_bank/src/features/wallet/presentation/screens/wallet_home.dart';
 
+// Transactions
 import 'package:ztc_bank/src/features/transactions/presentation/screens/transactions_list_screen.dart';
 import 'package:ztc_bank/src/features/transactions/presentation/screens/transaction_detail_screen.dart';
 
+// Send Receive
 import 'package:ztc_bank/src/features/send_receive/presentation/screens/send_money_screen.dart';
 import 'package:ztc_bank/src/features/send_receive/presentation/screens/receive_money_screen.dart';
 
+// New grouped features
 import 'package:ztc_bank/src/features/payments/presentation/screens/payments_screen.dart';
 import 'package:ztc_bank/src/features/cards/presentation/screens/cards_screen.dart';
 import 'package:ztc_bank/src/features/account/presentation/screens/account_screen.dart';
@@ -26,11 +32,13 @@ import 'package:ztc_bank/src/features/account/presentation/screens/account_scree
 final GoRouter appRouter = GoRouter(
   navigatorKey: rootNavigatorKey,
 
-  // Developer mode: skip onboarding/login
+  // Developer mode
+  // Skip onboarding/login for now
   initialLocation: AppRoutes.home,
 
   routes: <RouteBase>[
 
+    // Onboarding
     GoRoute(
       path: AppRoutes.onboarding,
       name: 'onboarding',
@@ -38,6 +46,8 @@ final GoRouter appRouter = GoRouter(
           const OnboardingPage(),
     ),
 
+
+    // Authentication
     GoRoute(
       path: AppRoutes.login,
       name: 'login',
@@ -59,6 +69,8 @@ final GoRouter appRouter = GoRouter(
           const ForgotPasswordScreen(),
     ),
 
+
+    // Home
     GoRoute(
       path: AppRoutes.home,
       name: 'home',
@@ -66,6 +78,8 @@ final GoRouter appRouter = GoRouter(
           const HomePage(),
     ),
 
+
+    // Wallet
     GoRoute(
       path: AppRoutes.wallet,
       name: 'wallet',
@@ -73,6 +87,8 @@ final GoRouter appRouter = GoRouter(
           const WalletHome(),
     ),
 
+
+    // Transactions
     GoRoute(
       path: AppRoutes.transactions,
       name: 'transactions',
@@ -85,12 +101,15 @@ final GoRouter appRouter = GoRouter(
       name: 'transactionDetail',
       builder: (context, state) {
         final id = state.pathParameters['id']!;
+
         return TransactionDetailScreen(
           transactionId: id,
         );
       },
     ),
 
+
+    // Send / Receive
     GoRoute(
       path: AppRoutes.sendMoney,
       name: 'sendMoney',
@@ -106,24 +125,27 @@ final GoRouter appRouter = GoRouter(
     ),
 
 
-    // New grouped features
-
+    // Payments Hub
     GoRoute(
-      path: '/payments',
+      path: AppRoutes.payments,
       name: 'payments',
       builder: (context, state) =>
           const PaymentsScreen(),
     ),
 
+
+    // Cards & Rewards Hub
     GoRoute(
-      path: '/cards',
+      path: AppRoutes.cards,
       name: 'cards',
       builder: (context, state) =>
           const CardsScreen(),
     ),
 
+
+    // Account Hub
     GoRoute(
-      path: '/account',
+      path: AppRoutes.account,
       name: 'account',
       builder: (context, state) =>
           const AccountScreen(),
