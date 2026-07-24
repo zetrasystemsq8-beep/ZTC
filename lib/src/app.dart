@@ -8,7 +8,6 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'src/imports/core_imports.dart';
 import 'src/routing/app_router.dart';
 import 'src/theme/theme.dart';
-import 'src/features/auth/presentation/wrappers/session_listener_wrapper.dart';
 import 'src/widgets/skeleton_wrapper.dart';
 
 class App extends ConsumerWidget {
@@ -36,7 +35,6 @@ class App extends ConsumerWidget {
       builder: (context, child) {
         Widget current = child!;
         current = SkeletonWrapper(child: current);
-        current = SessionListenerWrapper(child: current);
         return current;
       },
     );
