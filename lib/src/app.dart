@@ -2,9 +2,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import 'src/imports/core_imports.dart';
 import 'src/routing/app_router.dart';
+import 'src/theme/theme.dart';
+import 'src/features/auth/presentation/wrappers/session_listener_wrapper.dart';
+import 'src/widgets/skeleton_wrapper.dart';
 
 class App extends ConsumerWidget {
   const App({super.key});
