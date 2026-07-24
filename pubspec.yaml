@@ -96,4 +96,3 @@ flutter:
 
   assets:
     - assets/translations/
-    - .env
