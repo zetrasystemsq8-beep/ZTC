@@ -1,3 +1,4 @@
+import 'package:fpdart/fpdart.dart';
 import 'package:ztc_bank/src/imports/core_imports.dart';
 import 'package:ztc_bank/src/utils/utils.dart';
 
@@ -12,10 +13,7 @@ class WalletRepositoryImpl implements WalletRepository {
 
   @override
   FutureEither<Wallet> getWallet() async {
-    final result = await _dioService.get(
-      '/rest/v1/wallets',
-      queryParameters: {'select': '*'},
-    );
+    final result = await _dioService.get('/rest/v1/wallets', queryParameters: {'select': '*'});
 
     return result.fold(
       (failure) => left(failure),
@@ -58,8 +56,6 @@ class WalletRepositoryImpl implements WalletRepository {
     final result = await _dioService.post(
       '/rest/v1/transactions',
       data: {
-        'wallet_id': 'get_current_wallet_id', // needs to be dynamic
-        'user_id': 'auth.uid()',
         'amount': amount,
         'type': 'credit',
         'description': description,
@@ -86,8 +82,6 @@ class WalletRepositoryImpl implements WalletRepository {
     final result = await _dioService.post(
       '/rest/v1/transactions',
       data: {
-        'wallet_id': 'get_current_wallet_id',
-        'user_id': 'auth.uid()',
         'amount': amount,
         'type': 'debit',
         'description': description,
@@ -115,8 +109,6 @@ class WalletRepositoryImpl implements WalletRepository {
     final result = await _dioService.post(
       '/rest/v1/transactions',
       data: {
-        'wallet_id': 'get_current_wallet_id',
-        'user_id': 'auth.uid()',
         'amount': amount,
         'type': 'transfer',
         'description': description,
@@ -144,8 +136,6 @@ class WalletRepositoryImpl implements WalletRepository {
     final result = await _dioService.post(
       '/rest/v1/transactions',
       data: {
-        'wallet_id': 'get_current_wallet_id',
-        'user_id': 'auth.uid()',
         'amount': amount,
         'type': 'credit',
         'description': description,
