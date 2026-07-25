@@ -16,8 +16,25 @@ Future<void> main() async {
   FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
 
   try {
-    final supabaseUrl = String.fromEnvironment('SUPABASE_URL');
-    final supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
+    const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
+    const supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
+
+    debugPrint('======================================');
+    debugPrint('SUPABASE_URL: $supabaseUrl');
+    debugPrint('SUPABASE_ANON_KEY EMPTY: ${supabaseAnonKey.isEmpty}');
+    debugPrint('======================================');
+
+    if (supabaseUrl.isEmpty) {
+      throw Exception(
+        'SUPABASE_URL is empty. Check your GitHub Actions --dart-define.',
+      );
+    }
+
+    if (supabaseAnonKey.isEmpty) {
+      throw Exception(
+        'SUPABASE_ANON_KEY is empty. Check your GitHub Actions --dart-define.',
+      );
+    }
 
     await Supabase.initialize(
       url: supabaseUrl,
@@ -27,26 +44,28 @@ Future<void> main() async {
     await EasyLocalization.ensureInitialized();
     await AppConfig.init();
 
+    FlutterNativeSplash.remove();
+
+    runApp(
+      EasyLocalization(
+        supportedLocales: const [Locale('en')],
+        path: 'assets/translations',
+        fallbackLocale: const Locale('en'),
+        child: const ProviderScope(
+          child: MyApp(),
+        ),
+      ),
+    );
   } catch (e, s) {
     debugPrint('❌ Startup Error: $e');
     debugPrintStack(stackTrace: s);
+
     FlutterNativeSplash.remove();
-    runApp(ErrorApp(error: e.toString()));
-    return;
+
+    runApp(
+      ErrorApp(error: e.toString()),
+    );
   }
-
-  FlutterNativeSplash.remove();
-
-  runApp(
-    EasyLocalization(
-      supportedLocales: const [Locale('en')],
-      path: 'assets/translations',
-      fallbackLocale: const Locale('en'),
-      child: const ProviderScope(
-        child: MyApp(),
-      ),
-    ),
-  );
 }
 
 class MyApp extends ConsumerWidget {
@@ -63,7 +82,10 @@ class MyApp extends ConsumerWidget {
           title: 'ztc_bank',
           debugShowCheckedModeBanner: false,
           theme: ThemeData(useMaterial3: true),
-          darkTheme: ThemeData(useMaterial3: true, brightness: Brightness.dark),
+          darkTheme: ThemeData(
+            useMaterial3: true,
+            brightness: Brightness.dark,
+          ),
           themeMode: ThemeMode.system,
           localizationsDelegates: context.localizationDelegates,
           supportedLocales: context.supportedLocales,
@@ -77,7 +99,11 @@ class MyApp extends ConsumerWidget {
 
 class ErrorApp extends StatelessWidget {
   final String error;
-  const ErrorApp({required this.error});
+
+  const ErrorApp({
+    super.key,
+    required this.error,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -89,14 +115,21 @@ class ErrorApp extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.error, color: Colors.red, size: 64),
+                const Icon(
+                  Icons.error,
+                  color: Colors.red,
+                  size: 64,
+                ),
                 const SizedBox(height: 20),
                 const Text(
                   'Initialization Error',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 20),
-                Text(
+                SelectableText(
                   error,
                   textAlign: TextAlign.center,
                   style: const TextStyle(fontSize: 16),
