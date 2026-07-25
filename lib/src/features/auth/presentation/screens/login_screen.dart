@@ -3,9 +3,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:go_router/go_router.dart';
-
-import 'package:ztc_bank/src/features/auth/presentation/providers/auth_provider.dart';
-import 'package:ztc_bank/src/routing/app_routes.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class LoginScreen extends HookConsumerWidget {
   const LoginScreen({super.key});
@@ -16,9 +14,7 @@ class LoginScreen extends HookConsumerWidget {
     final emailController = useTextEditingController();
     final passwordController = useTextEditingController();
     final obscurePassword = useState(true);
-
-    final authState = ref.watch(authProvider);
-    final isLoading = authState.isLoading;
+    final isLoading = useState(false);
 
     return Scaffold(
       body: SafeArea(
@@ -58,17 +54,29 @@ class LoginScreen extends HookConsumerWidget {
                       width: double.infinity,
                       height: 48,
                       child: ElevatedButton(
-                        onPressed: isLoading
+                        onPressed: isLoading.value
                             ? null
-                            : () {
+                            : () async {
                                 if (formKey.currentState!.validate()) {
-                                  ref.read(authProvider.notifier).signIn(
-                                        email: emailController.text.trim(),
-                                        password: passwordController.text,
+                                  isLoading.value = true;
+                                  try {
+                                    await Supabase.instance.client.auth.signInWithPassword(
+                                      email: emailController.text.trim(),
+                                      password: passwordController.text,
+                                    );
+                                    if (context.mounted) context.go('/home');
+                                  } catch (e) {
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text('Error: $e')),
                                       );
+                                    }
+                                  } finally {
+                                    isLoading.value = false;
+                                  }
                                 }
                               },
-                        child: isLoading ? const CircularProgressIndicator() : const Text('Sign In'),
+                        child: isLoading.value ? const CircularProgressIndicator() : const Text('Sign In'),
                       ),
                     ),
                   ],
@@ -82,7 +90,7 @@ class LoginScreen extends HookConsumerWidget {
                     TextSpan(
                       text: 'Sign Up',
                       style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold),
-                      recognizer: TapGestureRecognizer()..onTap = () => context.push(AppRoutes.signup),
+                      recognizer: TapGestureRecognizer()..onTap = () => context.push('/signup'),
                     ),
                   ],
                 ),
