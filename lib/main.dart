@@ -4,11 +4,13 @@ import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import 'src/imports/packages_imports.dart';
 import 'src/imports/core_imports.dart';
 import 'src/app.dart';
 import 'src/config/app_config.dart';
+import 'src/routing/app_router.dart';
 
 Future<void> main() async {
   final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
@@ -49,11 +51,13 @@ Future<void> main() async {
   );
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends ConsumerWidget {
   const MyApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final appRouter = buildRouter(ref);
+
     return ScreenUtilInit(
       designSize: const Size(375, 812),
       builder: (_, child) {
@@ -66,8 +70,7 @@ class MyApp extends StatelessWidget {
           localizationsDelegates: context.localizationDelegates,
           supportedLocales: context.supportedLocales,
           locale: context.locale,
-          routerConfig: buildRouter(ProviderScope.containerOf(context)),
-          builder: (context, child) => child ?? const SizedBox(),
+          routerConfig: appRouter,
         );
       },
     );
