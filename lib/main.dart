@@ -5,7 +5,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-
 import 'src/imports/packages_imports.dart';
 import 'src/imports/core_imports.dart';
 import 'src/app.dart';
@@ -17,16 +16,15 @@ Future<void> main() async {
   FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
 
   try {
-    // Initialize Supabase with environment variables
+    final supabaseUrl = String.fromEnvironment('SUPABASE_URL');
+    final supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
+
     await Supabase.initialize(
-      url: String.fromEnvironment('SUPABASE_URL', defaultValue: ''),
-      anonKey: String.fromEnvironment('SUPABASE_ANON_KEY', defaultValue: ''),
+      url: supabaseUrl,
+      anonKey: supabaseAnonKey,
     );
 
-    // Initialize localization
     await EasyLocalization.ensureInitialized();
-
-    // Initialize app config
     await AppConfig.init();
 
   } catch (e, s) {
