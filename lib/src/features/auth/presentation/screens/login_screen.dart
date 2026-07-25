@@ -118,7 +118,7 @@ class LoginScreen extends HookConsumerWidget {
                     style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
                     children: [
                       TextSpan(
-                        text: ' ${AppRoutes.signup.tr()}',
+                        text: ' auth.sign_up'.tr()',
                         style: TextStyle(color: cs.primary, fontWeight: FontWeight.bold),
                       ),
                     ],
