@@ -1,7 +1,9 @@
-import 'package:ztc_bank/src/imports/core_imports.dart';
-import 'package:ztc_bank/src/imports/packages_imports.dart';
-
-import 'package:ztc_bank/src/features/auth/presentation/providers/auth_provider.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SignupScreen extends HookConsumerWidget {
   const SignupScreen({super.key});
@@ -15,203 +17,129 @@ class SignupScreen extends HookConsumerWidget {
     final confirmPasswordController = useTextEditingController();
     final obscurePassword = useState(true);
     final obscureConfirmPassword = useState(true);
+    final isLoading = useState(false);
 
-    final isLoading = ref.watch(authControllerProvider);
-
-    final cs = context.theme.colorScheme;
-    final tt = context.theme.textTheme;
-
-    Future<void> handleSignup() async {
-      if (!(formKey.currentState?.validate() ?? false)) return;
-
-      ref.read(authControllerProvider.notifier).signUp(
-        context: context, 
-        name: nameController.text,
-        email: emailController.text, 
-        password: passwordController.text,
-      );
-    }
-
-    return _SignupView(
-      formKey: formKey,
-      nameController: nameController,
-      emailController: emailController,
-      passwordController: passwordController,
-      confirmPasswordController: confirmPasswordController,
-      obscurePassword: obscurePassword.value,
-      obscureConfirmPassword: obscureConfirmPassword.value,
-      isLoading: isLoading,
-      onToggleObscure: () => obscurePassword.value = !obscurePassword.value,
-      onToggleConfirmObscure: () => obscureConfirmPassword.value = !obscureConfirmPassword.value,
-      onSignup: handleSignup,
-      cs: cs,
-      tt: tt,
-    );
-  }
-}
-
-class _SignupView extends StatelessWidget {
-  const _SignupView({
-    required this.formKey,
-    required this.nameController,
-    required this.emailController,
-    required this.passwordController,
-    required this.confirmPasswordController,
-    required this.obscurePassword,
-    required this.obscureConfirmPassword,
-    required this.isLoading,
-    required this.onToggleObscure,
-    required this.onToggleConfirmObscure,
-    required this.onSignup,
-    required this.cs,
-    required this.tt,
-  });
-
-  final GlobalKey<FormState> formKey;
-  final TextEditingController nameController;
-  final TextEditingController emailController;
-  final TextEditingController passwordController;
-  final TextEditingController confirmPasswordController;
-  final bool obscurePassword;
-  final bool obscureConfirmPassword;
-  final bool isLoading;
-  final VoidCallback onToggleObscure;
-  final VoidCallback onToggleConfirmObscure;
-  final VoidCallback onSignup;
-  final ColorScheme cs;
-  final TextTheme tt;
-
-  @override
-  Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.symmetric(horizontal: AppSpacing.lg.w),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                SizedBox(height: AppSpacing.xl.h),
-                Text(
-                  'auth.sign_up'.tr(),
-                  style: tt.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
-                ),
-                SizedBox(height: AppSpacing.sm.h),
-                Text(
-                  'auth.sign_up_subtitle'.tr(),
-                  textAlign: TextAlign.center,
-                  style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
-                ),
-                SizedBox(height: AppSpacing.xxxl.h),
-                Form(
-                  key: formKey,
-                  child: Column(
-                    children: [
-                      AppTextField(
-                        controller: nameController,
-                        enabled: !isLoading,
-                        label: 'auth.name'.tr(),
-                        prefixIcon: const Icon(IconsaxPlusBold.user),
-                        validator: (v) {
-                          if (AppUtils.isBlank(v)) {
-                            return 'auth.name_required'.tr();
-                          }
-                          return null;
-                        },
-                      ),
-                      SizedBox(height: AppSpacing.md.h),
-                      AppTextField(
-                        controller: emailController,
-                        enabled: !isLoading,
-                        label: 'auth.email'.tr(),
-                        prefixIcon: const Icon(IconsaxPlusBold.sms),
-                        validator: (v) {
-                          if (AppUtils.isBlank(v)) {
-                            return 'auth.email_required'.tr();
-                          }
-                          if (!AppUtils.isValidEmail(v!)) {
-                            return 'auth.email_invalid'.tr();
-                          }
-                          return null;
-                        },
-                      ),
-                      SizedBox(height: AppSpacing.md.h),
-                      AppTextField(
-                        controller: passwordController,
-                        enabled: !isLoading,
-                        label: 'auth.password'.tr(),
-                        obscureText: obscurePassword,
-                        prefixIcon: const Icon(IconsaxPlusBold.lock),
-                        suffixIcon: IconButton(
-                          icon: Icon(obscurePassword ? Icons.visibility_off : Icons.visibility),
-                          onPressed: onToggleObscure,
-                        ),
-                         validator: (v) {
-                          if (AppUtils.isBlank(v)) {
-                            return 'auth.password_required'.tr();
-                          }
-                          if (v!.length < 6) {
-                            return 'auth.password_too_short'.tr();
-                          }
-                          return null;
-                        },
-                      ),
-                      SizedBox(height: AppSpacing.md.h),
-                      AppTextField(
-                        controller: confirmPasswordController,
-                        enabled: !isLoading,
-                        label: 'auth.confirm_password'.tr(),
-                        obscureText: obscureConfirmPassword,
-                        prefixIcon: const Icon(IconsaxPlusBold.lock),
-                        suffixIcon: IconButton(
-                          icon: Icon(obscureConfirmPassword ? Icons.visibility_off : Icons.visibility),
-                          onPressed: onToggleConfirmObscure,
-                        ),
-                         validator: (v) {
-                          if (AppUtils.isBlank(v)) {
-                            return 'auth.confirm_password_required'.tr();
-                          }
-                          if (v != passwordController.text) {
-                            return 'auth.passwords_do_not_match'.tr();
-                          }
-                          return null;
-                        },
-                      ),
-                      SizedBox(height: AppSpacing.lg.h),
-                      AppButton(
-                        label: 'Sign Up',
-                        isLoading: isLoading,
-                        onPressed: isLoading ? null : onSignup,
-                        width: ButtonSize.large,
-                        isFullWidth: false,
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(height: AppSpacing.xxxl.h),
-                InkWell(
-                  onTap: () {
-                    context.push(AppRoutes.login);
-                  },
-                  child: RichText(
-                    text: TextSpan(
-                      text: 'auth.already_have_account'.tr(),
-                      style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
-                      children: [
-                        TextSpan(
-                          text: 'auth.log_in'.tr(),
-                          style: TextStyle(
-                            color: cs.primary,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            children: [
+              const SizedBox(height: 40),
+              const Text('Sign Up', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              const Text('Create your account', textAlign: TextAlign.center),
+              const SizedBox(height: 40),
+              Form(
+                key: formKey,
+                child: Column(
+                  spacing: 16,
+                  children: [
+                    TextFormField(
+                      controller: nameController,
+                      decoration: const InputDecoration(labelText: 'Full Name', border: OutlineInputBorder()),
+                      validator: (v) => (v == null || v.isEmpty) ? 'Name required' : null,
                     ),
-                  ),
+                    TextFormField(
+                      controller: emailController,
+                      decoration: const InputDecoration(labelText: 'Email', border: OutlineInputBorder()),
+                      validator: (v) => (v == null || v.isEmpty || !v.contains('@')) ? 'Invalid email' : null,
+                    ),
+                    TextFormField(
+                      controller: passwordController,
+                      obscureText: obscurePassword.value,
+                      decoration: InputDecoration(
+                        labelText: 'Password',
+                        border: const OutlineInputBorder(),
+                        suffixIcon: IconButton(
+                          icon: Icon(obscurePassword.value ? Icons.visibility_off : Icons.visibility),
+                          onPressed: () => obscurePassword.value = !obscurePassword.value,
+                        ),
+                      ),
+                      validator: (v) => (v == null || v.length < 6) ? 'Min 6 chars' : null,
+                    ),
+                    TextFormField(
+                      controller: confirmPasswordController,
+                      obscureText: obscureConfirmPassword.value,
+                      decoration: InputDecoration(
+                        labelText: 'Confirm Password',
+                        border: const OutlineInputBorder(),
+                        suffixIcon: IconButton(
+                          icon: Icon(obscureConfirmPassword.value ? Icons.visibility_off : Icons.visibility),
+                          onPressed: () => obscureConfirmPassword.value = !obscureConfirmPassword.value,
+                        ),
+                      ),
+                      validator: (v) {
+                        if (v == null || v.isEmpty) return 'Confirm password required';
+                        if (v != passwordController.text) return 'Passwords do not match';
+                        return null;
+                      },
+                    ),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton(
+                        onPressed: isLoading.value
+                            ? null
+                            : () async {
+                                if (formKey.currentState!.validate()) {
+                                  isLoading.value = true;
+                                  try {
+                                    final response = await Supabase.instance.client.auth.signUp(
+                                      email: emailController.text.trim(),
+                                      password: passwordController.text,
+                                    );
+
+                                    if (response.user != null) {
+                                      // Create wallet for new user
+                                      await Supabase.instance.client
+                                          .from('wallets')
+                                          .insert({
+                                            'user_id': response.user!.id,
+                                            'balance': 0.00,
+                                            'currency': 'CP',
+                                            'created_at': DateTime.now().toIso8601String(),
+                                            'updated_at': DateTime.now().toIso8601String(),
+                                          });
+
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text('Account created! Please log in.')),
+                                        );
+                                        context.go('/login');
+                                      }
+                                    }
+                                  } catch (e) {
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text('Error: $e')),
+                                      );
+                                    }
+                                  } finally {
+                                    isLoading.value = false;
+                                  }
+                                }
+                              },
+                        child: isLoading.value ? const CircularProgressIndicator() : const Text('Sign Up'),
+                      ),
+                    ),
+                  ],
                 ),
-                SizedBox(height: AppSpacing.xl.h),
-              ],
-            ),
+              ),
+              const SizedBox(height: 24),
+              Text.rich(
+                TextSpan(
+                  text: 'Already have an account? ',
+                  children: [
+                    TextSpan(
+                      text: 'Log In',
+                      style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold),
+                      recognizer: TapGestureRecognizer()..onTap = () => context.push('/login'),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),
