@@ -8,25 +8,14 @@ class AppConfig {
   static late final Dio dio;
   static late final http.Client httpClient;
 
-  // Supabase configuration
-  static String get supabaseUrl => String.fromEnvironment('SUPABASE_URL', defaultValue: '');
-  static String get supabaseAnonKey => String.fromEnvironment('SUPABASE_ANON_KEY', defaultValue: '');
-
-  static late final String baseUrl;
-
   static Future<void> init() async {
-    baseUrl = '$supabaseUrl/rest/v1';
-
     dio = Dio(
       BaseOptions(
-        baseUrl: baseUrl,
         connectTimeout: const Duration(seconds: 30),
         receiveTimeout: const Duration(seconds: 30),
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'Authorization': 'Bearer $supabaseAnonKey',
-          'apikey': supabaseAnonKey,
           'Prefer': 'return=representation',
         },
       ),
