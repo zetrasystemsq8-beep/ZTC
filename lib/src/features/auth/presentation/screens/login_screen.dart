@@ -1,6 +1,7 @@
 import 'package:ztc_bank/src/imports/core_imports.dart';
 import 'package:ztc_bank/src/imports/packages_imports.dart';
 import 'package:ztc_bank/src/features/auth/presentation/providers/auth_provider.dart';
+import 'package:ztc_bank/src/routing/app_routes.dart';
 
 class LoginScreen extends HookConsumerWidget {
   const LoginScreen({super.key});
@@ -118,7 +119,7 @@ class LoginScreen extends HookConsumerWidget {
                     style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
                     children: [
                       TextSpan(
-                        text: ' auth.sign_up'.tr()',
+                        text: ' ${AppRoutes.signup.tr()}',
                         style: TextStyle(color: cs.primary, fontWeight: FontWeight.bold),
                       ),
                     ],
