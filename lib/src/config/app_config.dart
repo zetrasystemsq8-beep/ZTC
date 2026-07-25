@@ -1,6 +1,5 @@
 import '../imports/core_imports.dart';
 import 'package:dio/dio.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
 class AppConfig {
@@ -10,8 +9,8 @@ class AppConfig {
   static late final http.Client httpClient;
 
   // Supabase configuration
-  static String get supabaseUrl => dotenv.get('SUPABASE_URL', fallback: '');
-  static String get supabaseAnonKey => dotenv.get('SUPABASE_ANON_KEY', fallback: '');
+  static String get supabaseUrl => String.fromEnvironment('SUPABASE_URL', defaultValue: '');
+  static String get supabaseAnonKey => String.fromEnvironment('SUPABASE_ANON_KEY', defaultValue: '');
 
   static late final String baseUrl;
 
