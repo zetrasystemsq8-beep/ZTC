@@ -73,7 +73,11 @@ class MyApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final appRouter = buildRouter(ref);
+    // Watching (not just reading) goRouterProvider matters here: it's what
+    // lets GoRouter's own refreshListenable pick up authProvider changes
+    // and re-run the redirect logic (login -> awaitingOtp -> authenticated)
+    // without this widget needing to rebuild the whole router itself.
+    final appRouter = ref.watch(goRouterProvider);
 
     return ScreenUtilInit(
       designSize: const Size(375, 812),
