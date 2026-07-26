@@ -5,7 +5,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
-import '../providers/auth_provider.dart';
+import 'package:ztc_bank/src/features/auth/presentation/providers/session_provider.dart';
 
 class LoginScreen extends HookConsumerWidget {
   const LoginScreen({super.key});
@@ -28,24 +28,19 @@ class LoginScreen extends HookConsumerWidget {
     final slide = Tween<Offset>(begin: const Offset(0, 0.08), end: Offset.zero)
         .animate(CurvedAnimation(parent: entrance, curve: Curves.easeOutCubic));
 
-    final authState = ref.watch(authProvider);
-    final isLoading = authState.isLoading;
+    final session = ref.watch(sessionProvider);
+    final isLoading = session.isLoading;
 
-    ref.listen<AsyncValue<AuthState>>(authProvider, (previous, next) {
-      next.whenData((s) {
-        if (s.stage == AuthStage.awaitingOtp) {
-          context.push('/verify-otp');
-        }
-      });
+    ref.listen<SessionState>(sessionProvider, (previous, next) {
+      if (next.status == SessionStatus.awaitingOtp) {
+        context.push('/verify-otp');
+      }
     });
-
-    final errorMessage =
-        authState.hasError ? authState.error.toString().replaceFirst('Exception: ', '') : null;
 
     Future<void> submit() async {
       FocusScope.of(context).unfocus();
       if (!formKey.currentState!.validate()) return;
-      await ref.read(authProvider.notifier).login(
+      await ref.read(sessionProvider.notifier).login(
             zetramail: zetramailController.text.trim(),
             password: passwordController.text.trim(),
           );
@@ -59,7 +54,6 @@ class LoginScreen extends HookConsumerWidget {
       backgroundColor: deepNavy,
       body: Stack(
         children: [
-          // Soft ambient gradient blobs for depth — not flat, not stock.
           Positioned(
             top: -120.h,
             right: -80.w,
@@ -112,12 +106,7 @@ class LoginScreen extends HookConsumerWidget {
                             Text(
                               'Welcome back',
                               textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 28.sp,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                                letterSpacing: -0.3,
-                              ),
+                              style: TextStyle(fontSize: 28.sp, fontWeight: FontWeight.w700, color: Colors.white, letterSpacing: -0.3),
                             ),
                             SizedBox(height: 8.h),
                             Text(
@@ -126,8 +115,6 @@ class LoginScreen extends HookConsumerWidget {
                               style: TextStyle(fontSize: 14.sp, color: Colors.white.withOpacity(0.6)),
                             ),
                             SizedBox(height: 36.h),
-
-                            // Glass card holding the form.
                             ClipRRect(
                               borderRadius: BorderRadius.circular(24.r),
                               child: BackdropFilter(
@@ -171,9 +158,7 @@ class LoginScreen extends HookConsumerWidget {
                                           onSubmitted: (_) => submit(),
                                           suffixIcon: IconButton(
                                             icon: Icon(
-                                              obscurePassword.value
-                                                  ? Icons.visibility_off_rounded
-                                                  : Icons.visibility_rounded,
+                                              obscurePassword.value ? Icons.visibility_off_rounded : Icons.visibility_rounded,
                                               color: Colors.white.withOpacity(0.5),
                                               size: 20.sp,
                                             ),
@@ -189,7 +174,7 @@ class LoginScreen extends HookConsumerWidget {
                                         AnimatedSize(
                                           duration: const Duration(milliseconds: 220),
                                           curve: Curves.easeOut,
-                                          child: errorMessage == null
+                                          child: session.errorMessage == null
                                               ? const SizedBox(width: double.infinity)
                                               : Padding(
                                                   padding: EdgeInsets.only(top: 14.h),
@@ -199,22 +184,16 @@ class LoginScreen extends HookConsumerWidget {
                                                     decoration: BoxDecoration(
                                                       color: const Color(0xFFEF4444).withOpacity(0.14),
                                                       borderRadius: BorderRadius.circular(12.r),
-                                                      border: Border.all(
-                                                        color: const Color(0xFFEF4444).withOpacity(0.3),
-                                                      ),
+                                                      border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.3)),
                                                     ),
                                                     child: Row(
                                                       children: [
-                                                        Icon(Icons.error_outline_rounded,
-                                                            color: const Color(0xFFFF6B6B), size: 18.sp),
+                                                        Icon(Icons.error_outline_rounded, color: const Color(0xFFFF6B6B), size: 18.sp),
                                                         SizedBox(width: 8.w),
                                                         Expanded(
                                                           child: Text(
-                                                            errorMessage,
-                                                            style: TextStyle(
-                                                              color: const Color(0xFFFF9B9B),
-                                                              fontSize: 12.5.sp,
-                                                            ),
+                                                            session.errorMessage!,
+                                                            style: TextStyle(color: const Color(0xFFFF9B9B), fontSize: 12.5.sp),
                                                           ),
                                                         ),
                                                       ],
@@ -234,10 +213,7 @@ class LoginScreen extends HookConsumerWidget {
                               children: [
                                 Icon(Icons.shield_outlined, size: 15.sp, color: Colors.white.withOpacity(0.4)),
                                 SizedBox(width: 6.w),
-                                Text(
-                                  'Secured by your Zetra ID',
-                                  style: TextStyle(fontSize: 12.sp, color: Colors.white.withOpacity(0.4)),
-                                ),
+                                Text('Secured by your Zetra ID', style: TextStyle(fontSize: 12.sp, color: Colors.white.withOpacity(0.4))),
                               ],
                             ),
                           ],
@@ -257,15 +233,7 @@ class LoginScreen extends HookConsumerWidget {
                               begin: Alignment.centerLeft,
                               end: Alignment.centerRight,
                             ),
-                            boxShadow: isLoading
-                                ? []
-                                : [
-                                    BoxShadow(
-                                      color: emerald.withOpacity(0.4),
-                                      blurRadius: 20,
-                                      offset: Offset(0, 8.h),
-                                    ),
-                                  ],
+                            boxShadow: isLoading ? [] : [BoxShadow(color: emerald.withOpacity(0.4), blurRadius: 20, offset: Offset(0, 8.h))],
                           ),
                           child: Material(
                             color: Colors.transparent,
@@ -274,25 +242,11 @@ class LoginScreen extends HookConsumerWidget {
                               onTap: isLoading ? null : submit,
                               child: Center(
                                 child: isLoading
-                                    ? SizedBox(
-                                        width: 24.w,
-                                        height: 24.w,
-                                        child: const CircularProgressIndicator(
-                                          strokeWidth: 2.6,
-                                          color: Colors.white,
-                                        ),
-                                      )
+                                    ? SizedBox(width: 24.w, height: 24.w, child: const CircularProgressIndicator(strokeWidth: 2.6, color: Colors.white))
                                     : Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          Text(
-                                            'Log In',
-                                            style: TextStyle(
-                                              fontSize: 16.sp,
-                                              fontWeight: FontWeight.w700,
-                                              color: Colors.white,
-                                            ),
-                                          ),
+                                          Text('Log In', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: Colors.white)),
                                           SizedBox(width: 8.w),
                                           Icon(Icons.arrow_forward_rounded, size: 18.sp, color: Colors.white),
                                         ],
@@ -314,7 +268,6 @@ class LoginScreen extends HookConsumerWidget {
   }
 }
 
-/// Soft blurred color blob used for ambient background depth.
 class _GlowBlob extends StatelessWidget {
   final Color color;
   final double size;
@@ -326,19 +279,13 @@ class _GlowBlob extends StatelessWidget {
       child: ClipRRect(
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 60, sigmaY: 60),
-          child: Container(
-            width: size,
-            height: size,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-          ),
+          child: Container(width: size, height: size, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
         ),
       ),
     );
   }
 }
 
-/// A text field styled for the dark glass card — filled, borderless,
-/// with a focus-aware accent border drawn via the decoration.
 class _FrostedField extends HookWidget {
   final TextEditingController controller;
   final FocusNode focusNode;
@@ -404,10 +351,7 @@ class _FrostedField extends HookWidget {
           suffixIcon: suffixIcon,
           filled: true,
           fillColor: Colors.white.withOpacity(0.04),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14.r),
-            borderSide: BorderSide.none,
-          ),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(14.r), borderSide: BorderSide.none),
           errorStyle: const TextStyle(color: Color(0xFFFF9B9B)),
         ),
       ),
