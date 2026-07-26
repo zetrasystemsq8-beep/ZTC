@@ -14,8 +14,11 @@ class App extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final appRouter = buildRouter(ref);
-    
+    // Watching (not reading) goRouterProvider so GoRouter's
+    // refreshListenable can react to authProvider changes and re-run the
+    // redirect logic (login -> awaitingOtp -> authenticated) live.
+    final appRouter = ref.watch(goRouterProvider);
+
     final current = _buildMaterialApp(context, appRouter);
     return ScreenUtilWrapper(child: current);
   }
