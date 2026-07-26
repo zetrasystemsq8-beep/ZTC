@@ -11,34 +11,37 @@ class AuthState {
   const AuthState({required this.stage, this.user});
 }
 
-final authProvider = StateNotifierProvider<AuthNotifier, AsyncValue<AuthState>>(
-  (ref) => AuthNotifier(),
-);
-
-class AuthNotifier extends StateNotifier<AsyncValue<AuthState>> {
-  AuthNotifier() : super(const AsyncValue.loading()) {
-    _loadInitialState();
-  }
-
-  void _loadInitialState() {
+/// Three-stage auth flow, matching NaijaLearn: password alone never
+/// authenticates. A session only counts as "authenticated" once the
+/// mandatory OTP step has also completed.
+class AuthNotifier extends AsyncNotifier<AuthState> {
+  /// Resolves the correct starting stage on app launch. Supabase creates a
+  /// valid session the instant the password check succeeds — BEFORE OTP
+  /// verification runs — so a bare "is there a session?" check isn't
+  /// enough: if the app was killed while the user was copying their code
+  /// from ZetraMail, this correctly sends them back to the OTP screen
+  /// instead of skipping straight to authenticated.
+  @override
+  Future<AuthState> build() async {
     final session = SupabaseService.currentSession;
     if (session == null) {
-      state = const AsyncValue.data(AuthState(stage: AuthStage.unauthenticated));
+      return const AuthState(stage: AuthStage.unauthenticated);
     } else if (SupabaseService.isOtpVerifiedForCurrentSession) {
-      state = AsyncValue.data(AuthState(stage: AuthStage.authenticated, user: SupabaseService.currentUser));
+      return AuthState(stage: AuthStage.authenticated, user: SupabaseService.currentUser);
     } else {
-      state = AsyncValue.data(AuthState(stage: AuthStage.awaitingOtp, user: SupabaseService.currentUser));
+      return AuthState(stage: AuthStage.awaitingOtp, user: SupabaseService.currentUser);
     }
   }
 
+  /// Step 1: ZetraMail + password. This app never creates accounts — only
+  /// existing Zetra users can sign in. Always lands on awaitingOtp on
+  /// success; never goes straight to authenticated.
   Future<void> login({required String zetramail, required String password}) async {
     state = const AsyncValue.loading();
-    try {
+    state = await AsyncValue.guard(() async {
       await SupabaseService.zetraLogin(zetramail: zetramail, password: password);
-      state = AsyncValue.data(AuthState(stage: AuthStage.awaitingOtp, user: SupabaseService.currentUser));
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
+      return AuthState(stage: AuthStage.awaitingOtp, user: SupabaseService.currentUser);
+    });
   }
 
   Future<void> resendOtp() async {
@@ -49,14 +52,15 @@ class AuthNotifier extends StateNotifier<AsyncValue<AuthState>> {
     }
   }
 
+  /// Step 2: the code from ZetraMail. On success, ensures a wallet exists
+  /// for first-time users of this app (handled inside
+  /// SupabaseService.verifyOtp) and moves to authenticated.
   Future<void> verifyOtp(String code) async {
     state = const AsyncValue.loading();
-    try {
+    state = await AsyncValue.guard(() async {
       await SupabaseService.verifyOtp(code);
-      state = AsyncValue.data(AuthState(stage: AuthStage.authenticated, user: SupabaseService.currentUser));
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
+      return AuthState(stage: AuthStage.authenticated, user: SupabaseService.currentUser);
+    });
   }
 
   Future<void> signOut() async {
@@ -64,3 +68,5 @@ class AuthNotifier extends StateNotifier<AsyncValue<AuthState>> {
     state = const AsyncValue.data(AuthState(stage: AuthStage.unauthenticated));
   }
 }
+
+final authProvider = AsyncNotifierProvider<AuthNotifier, AuthState>(AuthNotifier.new);
