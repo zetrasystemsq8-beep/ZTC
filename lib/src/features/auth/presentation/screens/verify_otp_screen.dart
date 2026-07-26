@@ -5,8 +5,8 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
-import '../providers/auth_provider.dart';
-import '../../../services/supabase_service.dart';
+import 'package:ztc_bank/src/features/auth/presentation/providers/auth_provider.dart';
+import 'package:ztc_bank/src/services/supabase_service.dart';
 
 class VerifyOtpScreen extends HookConsumerWidget {
   const VerifyOtpScreen({super.key});
@@ -44,7 +44,8 @@ class VerifyOtpScreen extends HookConsumerWidget {
       });
     });
 
-    final errorMessage = authState.hasError ? authState.error.toString().replaceFirst('Exception: ', '') : null;
+    final errorMessage =
+        authState.hasError ? authState.error.toString().replaceFirst('Exception: ', '') : null;
 
     Future<void> verify() async {
       if (!formKey.currentState!.validate()) return;
