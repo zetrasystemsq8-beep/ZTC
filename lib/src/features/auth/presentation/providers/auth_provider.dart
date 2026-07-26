@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../../services/supabase_service.dart';
+import 'package:ztc_bank/src/services/supabase_service.dart';
 
 enum AuthStage { unauthenticated, awaitingOtp, authenticated }
 
@@ -27,15 +27,10 @@ class AuthNotifier extends StateNotifier<AsyncValue<AuthState>> {
     } else if (SupabaseService.isOtpVerifiedForCurrentSession) {
       state = AsyncValue.data(AuthState(stage: AuthStage.authenticated, user: SupabaseService.currentUser));
     } else {
-      // Session exists but OTP was never completed — most likely the app
-      // was killed mid-verification. Go straight back to the OTP screen,
-      // no new code requested (the old one's still valid).
       state = AsyncValue.data(AuthState(stage: AuthStage.awaitingOtp, user: SupabaseService.currentUser));
     }
   }
 
-  /// Step 1 of login: ZetraMail + password. Always lands on awaitingOtp —
-  /// password alone never authenticates the app.
   Future<void> login({required String zetramail, required String password}) async {
     state = const AsyncValue.loading();
     try {
@@ -54,7 +49,6 @@ class AuthNotifier extends StateNotifier<AsyncValue<AuthState>> {
     }
   }
 
-  /// Step 2 of login: the code from ZetraMail.
   Future<void> verifyOtp(String code) async {
     state = const AsyncValue.loading();
     try {
