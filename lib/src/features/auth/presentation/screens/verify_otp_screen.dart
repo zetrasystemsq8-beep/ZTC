@@ -1,12 +1,10 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
-import 'package:ztc_bank/src/features/auth/presentation/providers/auth_provider.dart';
-import 'package:ztc_bank/src/services/supabase_service.dart';
+import 'package:ztc_bank/src/features/auth/presentation/providers/session_provider.dart';
 
 class VerifyOtpScreen extends HookConsumerWidget {
   const VerifyOtpScreen({super.key});
@@ -22,9 +20,8 @@ class VerifyOtpScreen extends HookConsumerWidget {
     final resending = useState(false);
 
     useEffect(() {
-      final timer = Timer.periodic(const Duration(seconds: 1), (t) {
+      final timer = Stream.periodic(const Duration(seconds: 1)).listen((_) {
         if (secondsLeft.value <= 1) {
-          t.cancel();
           secondsLeft.value = 0;
         } else {
           secondsLeft.value--;
@@ -33,44 +30,30 @@ class VerifyOtpScreen extends HookConsumerWidget {
       return timer.cancel;
     }, []);
 
-    final authState = ref.watch(authProvider);
-    final isLoading = authState.isLoading;
+    final session = ref.watch(sessionProvider);
+    final isLoading = session.isLoading;
 
-    ref.listen<AsyncValue<AuthState>>(authProvider, (previous, next) {
-      next.whenData((s) {
-        if (s.stage == AuthStage.authenticated) {
-          context.go('/home');
-        }
-      });
+    ref.listen<SessionState>(sessionProvider, (previous, next) {
+      if (next.status == SessionStatus.authenticated) {
+        context.go('/home');
+      }
     });
-
-    final errorMessage =
-        authState.hasError ? authState.error.toString().replaceFirst('Exception: ', '') : null;
 
     Future<void> verify() async {
       if (!formKey.currentState!.validate()) return;
-      await ref.read(authProvider.notifier).verifyOtp(codeController.text.trim());
+      await ref.read(sessionProvider.notifier).verifyOtp(codeController.text.trim());
     }
 
     Future<void> resend() async {
       if (secondsLeft.value > 0) return;
       resending.value = true;
-      try {
-        await SupabaseService.resendOtp();
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('A new code has been sent to your ZetraMail inbox.')),
-          );
-        }
-        secondsLeft.value = cooldownSeconds;
-      } catch (e) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
-          );
-        }
-      } finally {
-        resending.value = false;
+      await ref.read(sessionProvider.notifier).resendOtp();
+      resending.value = false;
+      secondsLeft.value = cooldownSeconds;
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('A new code has been sent to your ZetraMail inbox.')),
+        );
       }
     }
 
@@ -106,10 +89,7 @@ class VerifyOtpScreen extends HookConsumerWidget {
                           hintText: '------',
                           filled: true,
                           fillColor: scheme.surfaceContainerHighest,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14.r),
-                            borderSide: BorderSide.none,
-                          ),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(14.r), borderSide: BorderSide.none),
                         ),
                         validator: (v) {
                           final code = v?.trim() ?? '';
@@ -119,9 +99,9 @@ class VerifyOtpScreen extends HookConsumerWidget {
                         },
                         onFieldSubmitted: (_) => verify(),
                       ),
-                      if (errorMessage != null) ...[
+                      if (session.errorMessage != null) ...[
                         SizedBox(height: 12.h),
-                        Text(errorMessage, style: TextStyle(color: scheme.error, fontSize: 13.sp), textAlign: TextAlign.center),
+                        Text(session.errorMessage!, style: TextStyle(color: scheme.error, fontSize: 13.sp), textAlign: TextAlign.center),
                       ],
                     ],
                   ),
@@ -136,15 +116,9 @@ class VerifyOtpScreen extends HookConsumerWidget {
                       height: 52.h,
                       child: FilledButton(
                         onPressed: isLoading ? null : verify,
-                        style: FilledButton.styleFrom(
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14.r)),
-                        ),
+                        style: FilledButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14.r))),
                         child: isLoading
-                            ? SizedBox(
-                                width: 22.w,
-                                height: 22.w,
-                                child: const CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white),
-                              )
+                            ? SizedBox(width: 22.w, height: 22.w, child: const CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white))
                             : Text('Verify', style: TextStyle(fontSize: 16.sp)),
                       ),
                     ),
@@ -152,14 +126,8 @@ class VerifyOtpScreen extends HookConsumerWidget {
                     TextButton(
                       onPressed: (resending.value || secondsLeft.value > 0) ? null : resend,
                       child: resending.value
-                          ? SizedBox(
-                              width: 18.w,
-                              height: 18.w,
-                              child: const CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : Text(
-                              secondsLeft.value > 0 ? 'Resend code in ${secondsLeft.value}s' : "Didn't get a code? Resend",
-                            ),
+                          ? SizedBox(width: 18.w, height: 18.w, child: const CircularProgressIndicator(strokeWidth: 2))
+                          : Text(secondsLeft.value > 0 ? 'Resend code in ${secondsLeft.value}s' : "Didn't get a code? Resend"),
                     ),
                   ],
                 ),
