@@ -1,173 +1,88 @@
-// lib/src/routing/app_router.dart
-
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:ztc_bank/src/routing/global_navigator.dart';
-import 'package:ztc_bank/src/routing/app_routes.dart';
+import '../features/auth/presentation/providers/auth_provider.dart';
+import '../features/auth/presentation/screens/login_screen.dart';
+import '../features/auth/presentation/screens/verify_otp_screen.dart';
 
-// Auth Provider
-import 'package:ztc_bank/src/features/auth/presentation/providers/session_provider.dart';
+// TODO: point this at your real home screen
+import '../features/home/presentation/screens/home_screen.dart';
 
-// Auth Screens
-import 'package:ztc_bank/src/features/auth/presentation/screens/login_screen.dart';
-import 'package:ztc_bank/src/features/auth/presentation/screens/signup_screen.dart';
-import 'package:ztc_bank/src/features/auth/presentation/screens/forgot_password_screen.dart';
+/// Bridges Riverpod's authProvider changes into something GoRouter's
+/// `refreshListenable` understands, so route redirects re-evaluate the
+/// instant auth stage changes (login → awaitingOtp → authenticated).
+class _GoRouterRefreshNotifier extends ChangeNotifier {
+  _GoRouterRefreshNotifier(Ref ref) {
+    ref.listen<AsyncValue<AuthState>>(authProvider, (_, __) => notifyListeners());
+  }
+}
 
-// Core
-import 'package:ztc_bank/src/features/home/presentation/screens/home_page.dart';
-import 'package:ztc_bank/src/features/onboarding/presentation/screens/onboarding_page.dart';
+final goRouterProvider = Provider<GoRouter>((ref) {
+  final refreshNotifier = _GoRouterRefreshNotifier(ref);
+  ref.onDispose(refreshNotifier.dispose);
 
-// Wallet
-import 'package:ztc_bank/src/features/wallet/presentation/screens/wallet_home.dart';
-
-// Transactions
-import 'package:ztc_bank/src/features/transactions/presentation/screens/transactions_list_screen.dart';
-import 'package:ztc_bank/src/features/transactions/presentation/screens/transaction_detail_screen.dart';
-
-// Send / Receive
-import 'package:ztc_bank/src/features/send_receive/presentation/screens/send_money_screen.dart';
-import 'package:ztc_bank/src/features/send_receive/presentation/screens/receive_money_screen.dart';
-
-// Payments
-import 'package:ztc_bank/src/features/payments/presentation/screens/payments_screen.dart';
-
-// Cards
-import 'package:ztc_bank/src/features/cards/presentation/screens/cards_screen.dart';
-
-// Account
-import 'package:ztc_bank/src/features/account/presentation/screens/account_screen.dart';
-
-GoRouter buildRouter(WidgetRef ref) {
   return GoRouter(
-    navigatorKey: rootNavigatorKey,
-    initialLocation: AppRoutes.login,
-
+    initialLocation: '/splash',
+    refreshListenable: refreshNotifier,
     redirect: (context, state) {
-      final session = ref.watch(sessionProvider);
+      final authState = ref.read(authProvider);
+      final loc = state.matchedLocation;
 
-      final isAuthenticated =
-          session.status == SessionStatus.authenticated;
-
-      final isLoading =
-          session.status == SessionStatus.unknown;
-
-      final isAuthRoute =
-          state.matchedLocation == AppRoutes.login ||
-          state.matchedLocation == AppRoutes.signup ||
-          state.matchedLocation == AppRoutes.forgotPassword;
-
-      // Wait until the auth state has been determined.
-      if (isLoading) {
-        return null;
+      // Auth state hasn't resolved yet — hold on the splash route.
+      if (authState.isLoading) {
+        return loc == '/splash' ? null : '/splash';
       }
 
-      // Not logged in -> Login
-      if (!isAuthenticated && !isAuthRoute) {
-        return AppRoutes.login;
-      }
+      final stage = authState.valueOrNull?.stage ?? AuthStage.unauthenticated;
 
-      // Logged in -> Home
-      if (isAuthenticated && isAuthRoute) {
-        return AppRoutes.home;
+      switch (stage) {
+        case AuthStage.authenticated:
+          if (loc == '/login' || loc == '/verify-otp' || loc == '/splash') {
+            return '/home';
+          }
+          return null;
+        case AuthStage.awaitingOtp:
+          if (loc != '/verify-otp') return '/verify-otp';
+          return null;
+        case AuthStage.unauthenticated:
+          if (loc != '/login') return '/login';
+          return null;
       }
-
-      return null;
     },
-
     routes: [
-      // Onboarding
       GoRoute(
-        path: AppRoutes.onboarding,
-        name: 'onboarding',
-        builder: (context, state) => const OnboardingPage(),
+        path: '/splash',
+        builder: (context, state) => const _SplashScreen(),
       ),
-
-      // Login
       GoRoute(
-        path: AppRoutes.login,
-        name: 'login',
+        path: '/login',
         builder: (context, state) => const LoginScreen(),
       ),
-
-      // Signup
       GoRoute(
-        path: AppRoutes.signup,
-        name: 'signup',
-        builder: (context, state) => const SignupScreen(),
+        path: '/verify-otp',
+        builder: (context, state) => const VerifyOtpScreen(),
       ),
-
-      // Forgot Password
       GoRoute(
-        path: AppRoutes.forgotPassword,
-        name: 'forgotPassword',
-        builder: (context, state) => const ForgotPasswordScreen(),
+        path: '/home',
+        builder: (context, state) => const HomeScreen(),
       ),
-
-      // Home
-      GoRoute(
-        path: AppRoutes.home,
-        name: 'home',
-        builder: (context, state) => const HomePage(),
-      ),
-
-      // Wallet
-      GoRoute(
-        path: AppRoutes.wallet,
-        name: 'wallet',
-        builder: (context, state) => const WalletHome(),
-      ),
-
-      // Transactions
-      GoRoute(
-        path: AppRoutes.transactions,
-        name: 'transactions',
-        builder: (context, state) => const TransactionsListScreen(),
-      ),
-
-      GoRoute(
-        path: '${AppRoutes.transactions}/:id',
-        name: 'transactionDetail',
-        builder: (context, state) {
-          final id = state.pathParameters['id']!;
-          return TransactionDetailScreen(transactionId: id);
-        },
-      ),
-
-      // Send Money
-      GoRoute(
-        path: AppRoutes.sendMoney,
-        name: 'sendMoney',
-        builder: (context, state) => const SendMoneyScreen(),
-      ),
-
-      // Receive Money
-      GoRoute(
-        path: AppRoutes.receiveMoney,
-        name: 'receiveMoney',
-        builder: (context, state) => const ReceiveMoneyScreen(),
-      ),
-
-      // Payments
-      GoRoute(
-        path: AppRoutes.payments,
-        name: 'payments',
-        builder: (context, state) => const PaymentsScreen(),
-      ),
-
-      // Cards
-      GoRoute(
-        path: AppRoutes.cards,
-        name: 'cards',
-        builder: (context, state) => const CardsScreen(),
-      ),
-
-      // Account
-      GoRoute(
-        path: AppRoutes.account,
-        name: 'account',
-        builder: (context, state) => const AccountScreen(),
-      ),
+      // Deliberately no '/signup' or '/forgot-password' routes — this app
+      // is a pure Zetra-login client, same as NaijaLearn.
     ],
   );
+});
+
+/// Minimal splash shown only for the brief window while authProvider
+/// resolves its initial state (session check). The redirect above moves
+/// past this automatically once that resolves.
+class _SplashScreen extends StatelessWidget {
+  const _SplashScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: Center(child: CircularProgressIndicator()),
+    );
+  }
 }
