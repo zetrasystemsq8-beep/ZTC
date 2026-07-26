@@ -1,8 +1,12 @@
+// lib/src/features/auth/presentation/providers/auth_provider.dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../services/supabase_service.dart';
 
+/// Three-stage auth flow, matching NaijaLearn: password alone never
+/// authenticates. A session only counts as "authenticated" once the
+/// mandatory OTP step has also completed.
 enum AuthStage { unauthenticated, awaitingOtp, authenticated }
 
 class AuthState {
@@ -20,6 +24,12 @@ class AuthNotifier extends StateNotifier<AsyncValue<AuthState>> {
     _loadInitialState();
   }
 
+  /// Resolves the correct starting stage on app launch. This matters
+  /// because Supabase creates a valid session the instant the password
+  /// check succeeds — BEFORE OTP verification runs. So a bare "is there a
+  /// session?" check isn't enough: if the app was killed while the user
+  /// was copying their code from ZetraMail, this correctly sends them back
+  /// to the OTP screen instead of skipping straight to authenticated.
   void _loadInitialState() {
     final session = SupabaseService.currentSession;
     if (session == null) {
@@ -27,15 +37,13 @@ class AuthNotifier extends StateNotifier<AsyncValue<AuthState>> {
     } else if (SupabaseService.isOtpVerifiedForCurrentSession) {
       state = AsyncValue.data(AuthState(stage: AuthStage.authenticated, user: SupabaseService.currentUser));
     } else {
-      // Session exists but OTP was never completed — most likely the app
-      // was killed mid-verification. Go straight back to the OTP screen,
-      // no new code requested (the old one's still valid).
       state = AsyncValue.data(AuthState(stage: AuthStage.awaitingOtp, user: SupabaseService.currentUser));
     }
   }
 
-  /// Step 1 of login: ZetraMail + password. Always lands on awaitingOtp —
-  /// password alone never authenticates the app.
+  /// Step 1: ZetraMail + password. This app never creates accounts — only
+  /// existing Zetra users can sign in. Always lands on awaitingOtp on
+  /// success; never goes straight to authenticated.
   Future<void> login({required String zetramail, required String password}) async {
     state = const AsyncValue.loading();
     try {
@@ -54,7 +62,9 @@ class AuthNotifier extends StateNotifier<AsyncValue<AuthState>> {
     }
   }
 
-  /// Step 2 of login: the code from ZetraMail.
+  /// Step 2: the code from ZetraMail. On success, ensures a wallet exists
+  /// for first-time users of this app (handled inside
+  /// SupabaseService.verifyOtp) and moves to authenticated.
   Future<void> verifyOtp(String code) async {
     state = const AsyncValue.loading();
     try {
