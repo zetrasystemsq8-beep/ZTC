@@ -1,89 +1,72 @@
-import 'package:ztc_bank/src/imports/core_imports.dart';
-import 'package:ztc_bank/src/imports/packages_imports.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'package:ztc_bank/src/features/auth/domain/repositories/auth_repository.dart';
-import 'package:ztc_bank/src/features/auth/data/repositories/auth_repository_impl.dart';
+import '../../../services/supabase_service.dart';
 
-// Provides the single instance of AuthRepositoryImpl 
-final authRepositoryProvider = Provider<AuthRepository>((ref) {
-  return AuthRepositoryImpl();
-});
+enum AuthStage { unauthenticated, awaitingOtp, authenticated }
 
-final authControllerProvider = StateNotifierProvider<AuthController, bool>((ref) {
-  return AuthController(
-    repository: ref.read(authRepositoryProvider),
-  );
-});
-
-class AuthController extends StateNotifier<bool> {
-  final AuthRepository _repository;
-
-  AuthController({
-    required AuthRepository repository,
-  })  : _repository = repository,
-        super(false); // loading state is false
-
-  void login({required BuildContext context, required String email, required String password}) async {
-    state = true;
-    
-    final result = await _repository.login(email: email, password: password);
-    
-    state = false;
-    result.fold(
-      (failure) {
-        if (context.mounted) {
-          showToast(context, message: failure.message, status: 'error');
-        }
-      },
-      (user) {
-        if (rootContext?.mounted ?? false) {
-          rootContext!.go(AppRoutes.home);
-        }
-      },
-    );
-  }
-
-  void signUp({required BuildContext context, required String name, required String email, required String password}) async {
-    state = true;
-    
-    final result = await _repository.signUp(name: name, email: email, password: password);
-    
-    state = false;
-    result.fold(
-      (failure) {
-        if (context.mounted) {
-          showToast(context, message: failure.message, status: 'error');
-        }
-      },
-      (user) {
-        if (rootContext?.mounted ?? false) {
-          rootContext!.go(AppRoutes.home);
-        }
-      },
-    );
-  }
-
-  void forgotPassword({required BuildContext context, required String email}) async {
-    state = true;
-    
-    final result = await _repository.forgotPassword(email: email);
-
-    state = false;
-    result.fold(
-      (failure) {
-        if (context.mounted) {
-          showToast(context, message: failure.message, status: 'error');
-        }
-      },
-      (success) {
-        if (context.mounted) {
-          showToast(context, message: 'Password reset link sent successfully', status: 'success');
-        }
-        if (context.mounted) {
-          context.go(AppRoutes.login);
-        }
-      },
-    );
-  }
+class AuthState {
+  final AuthStage stage;
+  final User? user;
+  const AuthState({required this.stage, this.user});
 }
 
+final authProvider = StateNotifierProvider<AuthNotifier, AsyncValue<AuthState>>(
+  (ref) => AuthNotifier(),
+);
+
+class AuthNotifier extends StateNotifier<AsyncValue<AuthState>> {
+  AuthNotifier() : super(const AsyncValue.loading()) {
+    _loadInitialState();
+  }
+
+  void _loadInitialState() {
+    final session = SupabaseService.currentSession;
+    if (session == null) {
+      state = const AsyncValue.data(AuthState(stage: AuthStage.unauthenticated));
+    } else if (SupabaseService.isOtpVerifiedForCurrentSession) {
+      state = AsyncValue.data(AuthState(stage: AuthStage.authenticated, user: SupabaseService.currentUser));
+    } else {
+      // Session exists but OTP was never completed — most likely the app
+      // was killed mid-verification. Go straight back to the OTP screen,
+      // no new code requested (the old one's still valid).
+      state = AsyncValue.data(AuthState(stage: AuthStage.awaitingOtp, user: SupabaseService.currentUser));
+    }
+  }
+
+  /// Step 1 of login: ZetraMail + password. Always lands on awaitingOtp —
+  /// password alone never authenticates the app.
+  Future<void> login({required String zetramail, required String password}) async {
+    state = const AsyncValue.loading();
+    try {
+      await SupabaseService.zetraLogin(zetramail: zetramail, password: password);
+      state = AsyncValue.data(AuthState(stage: AuthStage.awaitingOtp, user: SupabaseService.currentUser));
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+
+  Future<void> resendOtp() async {
+    try {
+      await SupabaseService.resendOtp();
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+
+  /// Step 2 of login: the code from ZetraMail.
+  Future<void> verifyOtp(String code) async {
+    state = const AsyncValue.loading();
+    try {
+      await SupabaseService.verifyOtp(code);
+      state = AsyncValue.data(AuthState(stage: AuthStage.authenticated, user: SupabaseService.currentUser));
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+
+  Future<void> signOut() async {
+    await SupabaseService.signOut();
+    state = const AsyncValue.data(AuthState(stage: AuthStage.unauthenticated));
+  }
+}
