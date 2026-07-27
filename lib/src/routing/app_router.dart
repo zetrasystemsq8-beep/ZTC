@@ -2,10 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'app_routes.dart';
 import '../features/auth/presentation/providers/session_provider.dart';
 import '../features/auth/presentation/screens/login_screen.dart';
 import '../features/auth/presentation/screens/verify_otp_screen.dart';
 import '../features/home/presentation/screens/home_page.dart';
+import '../features/wallet/presentation/screens/wallet_home.dart';
+import '../features/transactions/presentation/screens/transactions_list_screen.dart';
+import '../features/transactions/presentation/screens/transaction_detail_screen.dart';
+import '../features/send_receive/presentation/screens/send_money_screen.dart';
+import '../features/send_receive/presentation/screens/receive_money_screen.dart';
 
 class _GoRouterRefreshNotifier extends ChangeNotifier {
   _GoRouterRefreshNotifier(Ref ref) {
@@ -18,7 +24,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
   ref.onDispose(refreshNotifier.dispose);
 
   return GoRouter(
-    initialLocation: '/splash',
+    initialLocation: AppRoutes.splash,
     refreshListenable: refreshNotifier,
     redirect: (context, state) {
       final session = ref.read(sessionProvider);
@@ -26,22 +32,63 @@ final goRouterProvider = Provider<GoRouter>((ref) {
 
       switch (session.status) {
         case SessionStatus.unknown:
-          return loc == '/splash' ? null : '/splash';
+          return loc == AppRoutes.splash ? null : AppRoutes.splash;
         case SessionStatus.unauthenticated:
-          return loc == '/login' ? null : '/login';
+          return loc == AppRoutes.login ? null : AppRoutes.login;
         case SessionStatus.awaitingOtp:
           return loc == '/verify-otp' ? null : '/verify-otp';
         case SessionStatus.authenticated:
-          if (loc == '/login' || loc == '/verify-otp' || loc == '/splash') return '/home';
+          if (loc == AppRoutes.login ||
+              loc == '/verify-otp' ||
+              loc == AppRoutes.splash) {
+            return AppRoutes.home;
+          }
           return null;
       }
     },
     routes: [
-      GoRoute(path: '/splash', builder: (context, state) => const _SplashScreen()),
-      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
-      GoRoute(path: '/verify-otp', builder: (context, state) => const VerifyOtpScreen()),
-      GoRoute(path: '/home', builder: (context, state) => const HomePage()),
-      // No '/signup' or '/forgot-password' — Zetra-login-only client.
+      GoRoute(
+        path: AppRoutes.splash,
+        builder: (context, state) => const _SplashScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.login,
+        builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: '/verify-otp',
+        builder: (context, state) => const VerifyOtpScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.home,
+        builder: (context, state) => const HomePage(),
+      ),
+      GoRoute(
+        path: AppRoutes.wallet,
+        builder: (context, state) => const WalletHome(),
+      ),
+      GoRoute(
+        path: AppRoutes.transactions,
+        builder: (context, state) => const TransactionsListScreen(),
+        routes: [
+          GoRoute(
+            path: ':id',
+            builder: (context, state) => TransactionDetailScreen(
+              transactionId: state.pathParameters['id']!,
+            ),
+          ),
+        ],
+      ),
+      GoRoute(
+        path: AppRoutes.sendMoney,
+        builder: (context, state) => const SendMoneyScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.receiveMoney,
+        builder: (context, state) => const ReceiveMoneyScreen(),
+      ),
+      // No AppRoutes.signup / AppRoutes.forgotPassword routes —
+      // Zetra-login-only client. Constants kept for future use.
     ],
   );
 });
