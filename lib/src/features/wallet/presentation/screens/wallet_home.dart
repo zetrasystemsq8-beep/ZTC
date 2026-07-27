@@ -3,7 +3,6 @@ import 'package:ztc_bank/src/imports/packages_imports.dart';
 
 import 'package:ztc_bank/src/features/wallet/presentation/providers/wallet_provider.dart';
 import 'package:ztc_bank/src/features/wallet/presentation/widgets/balance_card.dart';
-import 'package:ztc_bank/src/features/wallet/presentation/widgets/action_buttons.dart';
 import 'package:ztc_bank/src/features/wallet/presentation/widgets/recent_transactions.dart';
 
 class WalletHome extends HookConsumerWidget {
@@ -12,7 +11,6 @@ class WalletHome extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final cs = context.theme.colorScheme;
-    final tt = context.theme.textTheme;
 
     final walletAsyncValue = ref.watch(walletProvider);
     final transactionsAsyncValue = ref.watch(transactionsProvider);
@@ -21,14 +19,6 @@ class WalletHome extends HookConsumerWidget {
       backgroundColor: cs.surface,
       appBar: AppTopBar(
         title: 'Wallet',
-        actions: [
-          IconButton(
-            icon: Icon(IconsaxPlusLinear.setting_2, color: cs.onSurface),
-            onPressed: () {
-              // Navigate to settings
-            },
-          ),
-        ],
       ),
       body: RefreshIndicator(
         onRefresh: () async {
@@ -51,20 +41,28 @@ class WalletHome extends HookConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Balance Card
                     BalanceCard(wallet: wallet),
                     SizedBox(height: AppSpacing.xl.h),
-
-                    // Action Buttons
-                    ActionButtons(
-                      onDeposit: () => _showDepositDialog(context, ref),
-                      onWithdraw: () => _showWithdrawDialog(context, ref),
-                      onSend: () => _showSendDialog(context, ref),
-                      onReceive: () => _showReceiveDialog(context, ref),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => _showSendDialog(context, ref),
+                            icon: const Icon(IconsaxPlusBold.send_2),
+                            label: const Text('Send'),
+                          ),
+                        ),
+                        SizedBox(width: AppSpacing.md.w),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => context.push(AppRoutes.receiveMoney),
+                            icon: const Icon(IconsaxPlusBold.receive_square),
+                            label: const Text('Receive'),
+                          ),
+                        ),
+                      ],
                     ),
                     SizedBox(height: AppSpacing.xl.h),
-
-                    // Recent Transactions
                     transactionsAsyncValue.when(
                       loading: () => const AppLoading(),
                       error: (error, stack) => AppErrorWidget(
@@ -84,7 +82,7 @@ class WalletHome extends HookConsumerWidget {
                         return RecentTransactions(
                           transactions: transactions,
                           onSeeAll: () {
-                            // Navigate to all transactions
+                            context.push(AppRoutes.transactions);
                           },
                         );
                       },
@@ -99,164 +97,14 @@ class WalletHome extends HookConsumerWidget {
     );
   }
 
-  void _showDepositDialog(BuildContext context, WidgetRef ref) {
-    showDialog(
-      context: context,
-      builder: (context) => _DepositDialog(ref: ref),
-    );
-  }
-
-  void _showWithdrawDialog(BuildContext context, WidgetRef ref) {
-    showDialog(
-      context: context,
-      builder: (context) => _WithdrawDialog(ref: ref),
-    );
-  }
-
   void _showSendDialog(BuildContext context, WidgetRef ref) {
     showDialog(
       context: context,
       builder: (context) => _SendDialog(ref: ref),
     );
   }
-
-  void _showReceiveDialog(BuildContext context, WidgetRef ref) {
-    showDialog(
-      context: context,
-      builder: (context) => _ReceiveDialog(ref: ref),
-    );
-  }
 }
 
-// Deposit Dialog
-class _DepositDialog extends HookConsumerWidget {
-  final WidgetRef ref;
-
-  const _DepositDialog({required this.ref});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final amountController = useTextEditingController();
-    final descriptionController = useTextEditingController();
-    final isLoading = useState(false);
-
-    final cs = context.theme.colorScheme;
-    final tt = context.theme.textTheme;
-
-    return AlertDialog(
-      title: Text('Deposit Funds', style: tt.titleLarge),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          AppTextField(
-            controller: amountController,
-            label: 'Amount',
-            prefixIcon: const Icon(IconsaxPlusBold.money),
-            keyboardType: TextInputType.number,
-          ),
-          SizedBox(height: AppSpacing.md.h),
-          AppTextField(
-            controller: descriptionController,
-            label: 'Description (Optional)',
-            prefixIcon: const Icon(IconsaxPlusBold.note),
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text('Cancel', style: TextStyle(color: cs.error)),
-        ),
-        TextButton(
-          onPressed: isLoading.value
-              ? null
-              : () async {
-                  isLoading.value = true;
-                  final amount = double.tryParse(amountController.text) ?? 0;
-                  await ref
-                      .read(walletProvider.notifier)
-                      .deposit(amount, descriptionController.text);
-                  isLoading.value = false;
-                  if (context.mounted) {
-                    Navigator.pop(context);
-                    showToast(context, message: 'Deposit successful', status: 'success');
-                  }
-                },
-          child: Text(
-            isLoading.value ? 'Processing...' : 'Deposit',
-            style: TextStyle(color: cs.primary),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// Withdraw Dialog
-class _WithdrawDialog extends HookConsumerWidget {
-  final WidgetRef ref;
-
-  const _WithdrawDialog({required this.ref});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final amountController = useTextEditingController();
-    final descriptionController = useTextEditingController();
-    final isLoading = useState(false);
-
-    final cs = context.theme.colorScheme;
-    final tt = context.theme.textTheme;
-
-    return AlertDialog(
-      title: Text('Withdraw Funds', style: tt.titleLarge),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          AppTextField(
-            controller: amountController,
-            label: 'Amount',
-            prefixIcon: const Icon(IconsaxPlusBold.money),
-            keyboardType: TextInputType.number,
-          ),
-          SizedBox(height: AppSpacing.md.h),
-          AppTextField(
-            controller: descriptionController,
-            label: 'Description (Optional)',
-            prefixIcon: const Icon(IconsaxPlusBold.note),
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text('Cancel', style: TextStyle(color: cs.error)),
-        ),
-        TextButton(
-          onPressed: isLoading.value
-              ? null
-              : () async {
-                  isLoading.value = true;
-                  final amount = double.tryParse(amountController.text) ?? 0;
-                  await ref
-                      .read(walletProvider.notifier)
-                      .withdraw(amount, descriptionController.text);
-                  isLoading.value = false;
-                  if (context.mounted) {
-                    Navigator.pop(context);
-                    showToast(context, message: 'Withdrawal successful', status: 'success');
-                  }
-                },
-          child: Text(
-            isLoading.value ? 'Processing...' : 'Withdraw',
-            style: TextStyle(color: cs.primary),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// Send Dialog
 class _SendDialog extends HookConsumerWidget {
   final WidgetRef ref;
 
@@ -279,9 +127,8 @@ class _SendDialog extends HookConsumerWidget {
         children: [
           AppTextField(
             controller: recipientController,
-            label: 'Recipient Email',
+            label: 'Recipient Zetra ID',
             prefixIcon: const Icon(IconsaxPlusBold.sms),
-            keyboardType: TextInputType.emailAddress,
           ),
           SizedBox(height: AppSpacing.md.h),
           AppTextField(
@@ -322,70 +169,6 @@ class _SendDialog extends HookConsumerWidget {
                 },
           child: Text(
             isLoading.value ? 'Sending...' : 'Send',
-            style: TextStyle(color: cs.primary),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// Receive Dialog
-class _ReceiveDialog extends HookConsumerWidget {
-  final WidgetRef ref;
-
-  const _ReceiveDialog({required this.ref});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final amountController = useTextEditingController();
-    final descriptionController = useTextEditingController();
-    final isLoading = useState(false);
-
-    final cs = context.theme.colorScheme;
-    final tt = context.theme.textTheme;
-
-    return AlertDialog(
-      title: Text('Request Money', style: tt.titleLarge),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          AppTextField(
-            controller: amountController,
-            label: 'Amount',
-            prefixIcon: const Icon(IconsaxPlusBold.money),
-            keyboardType: TextInputType.number,
-          ),
-          SizedBox(height: AppSpacing.md.h),
-          AppTextField(
-            controller: descriptionController,
-            label: 'Description (Optional)',
-            prefixIcon: const Icon(IconsaxPlusBold.note),
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text('Cancel', style: TextStyle(color: cs.error)),
-        ),
-        TextButton(
-          onPressed: isLoading.value
-              ? null
-              : () async {
-                  isLoading.value = true;
-                  final amount = double.tryParse(amountController.text) ?? 0;
-                  await ref
-                      .read(walletProvider.notifier)
-                      .receive(amount, descriptionController.text);
-                  isLoading.value = false;
-                  if (context.mounted) {
-                    Navigator.pop(context);
-                    showToast(context, message: 'Request sent successfully', status: 'success');
-                  }
-                },
-          child: Text(
-            isLoading.value ? 'Sending...' : 'Request',
             style: TextStyle(color: cs.primary),
           ),
         ),
