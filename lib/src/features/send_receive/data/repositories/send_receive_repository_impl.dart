@@ -1,6 +1,5 @@
 import 'package:fpdart/fpdart.dart';
 import 'package:ztc_bank/src/utils/utils.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide User;
 import 'package:ztc_bank/src/features/send_receive/domain/entities/user.dart';
 import 'package:ztc_bank/src/features/send_receive/domain/repositories/send_receive_repository.dart';
