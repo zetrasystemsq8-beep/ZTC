@@ -9,13 +9,19 @@ class AppConfig {
   static late final http.Client httpClient;
 
   static Future<void> init() async {
+    final supabaseUrl = String.fromEnvironment('SUPABASE_URL', defaultValue: 'https://YOUR-PROJECT.supabase.co');
+    final supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY', defaultValue: 'YOUR-ANON-KEY');
+
     dio = Dio(
       BaseOptions(
+        baseUrl: '$supabaseUrl/rest/v1',
         connectTimeout: const Duration(seconds: 30),
         receiveTimeout: const Duration(seconds: 30),
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
+          'Authorization': 'Bearer $supabaseAnonKey',
+          'apikey': supabaseAnonKey,
           'Prefer': 'return=representation',
         },
       ),
@@ -24,21 +30,15 @@ class AppConfig {
     dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) {
-          AppLogger.info(
-            '🌐 [DIO] REQUEST[${options.method}] => PATH: ${options.path}',
-          );
+          AppLogger.info('🌐 [DIO] REQUEST[${options.method}] => PATH: ${options.path}');
           handler.next(options);
         },
         onResponse: (response, handler) {
-          AppLogger.info(
-            '✅ [DIO] RESPONSE[${response.statusCode}] => PATH: ${response.requestOptions.path}',
-          );
+          AppLogger.info('✅ [DIO] RESPONSE[${response.statusCode}] => PATH: ${response.requestOptions.path}');
           handler.next(response);
         },
         onError: (e, handler) {
-          AppLogger.error(
-            '❌ [DIO] ERROR[${e.response?.statusCode}] => PATH: ${e.requestOptions.path}',
-          );
+          AppLogger.error('❌ [DIO] ERROR[${e.response?.statusCode}] => PATH: ${e.requestOptions.path}');
           handler.next(e);
         },
       ),
