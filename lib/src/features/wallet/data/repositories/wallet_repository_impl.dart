@@ -1,6 +1,7 @@
 import 'package:fpdart/fpdart.dart';
 import 'package:ztc_bank/src/imports/core_imports.dart';
 import 'package:ztc_bank/src/utils/utils.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:ztc_bank/src/features/wallet/domain/entities/wallet.dart';
 import 'package:ztc_bank/src/features/wallet/domain/entities/transaction.dart';
@@ -13,39 +14,61 @@ class WalletRepositoryImpl implements WalletRepository {
 
   @override
   FutureEither<Wallet> getWallet() async {
-    final result = await _dioService.get('/rest/v1/wallets', queryParameters: {'select': '*'});
+    try {
+      final currentUser = Supabase.instance.client.auth.currentUser;
+      
+      if (currentUser == null) {
+        return left(Failure('User not authenticated'));
+      }
 
-    return result.fold(
-      (failure) => left(failure),
-      (response) {
-        final data = (response.data as List).first as Map<String, dynamic>;
-        final wallet = WalletModel.fromJson(data);
-        return right(wallet);
-      },
-    );
+      final result = await _dioService.get(
+        '/wallets?user_id=eq.${currentUser.id}&select=*',
+      );
+
+      return result.fold(
+        (failure) => left(failure),
+        (response) {
+          if (response.data is! List || (response.data as List).isEmpty) {
+            return left(Failure('No wallet found'));
+          }
+          final data = (response.data as List).first as Map<String, dynamic>;
+          final wallet = WalletModel.fromJson(data);
+          return right(wallet);
+        },
+      );
+    } catch (e) {
+      return left(Failure(e.toString()));
+    }
   }
 
   @override
   FutureEither<List<Transaction>> getRecentTransactions({int limit = 10}) async {
-    final result = await _dioService.get(
-      '/rest/v1/transactions',
-      queryParameters: {
-        'select': '*',
-        'order': 'created_at.desc',
-        'limit': limit,
-      },
-    );
+    try {
+      final currentUser = Supabase.instance.client.auth.currentUser;
+      
+      if (currentUser == null) {
+        return left(Failure('User not authenticated'));
+      }
 
-    return result.fold(
-      (failure) => left(failure),
-      (response) {
-        final data = response.data as List<dynamic>;
-        final transactions = data
-            .map((json) => TransactionModel.fromJson(json as Map<String, dynamic>))
-            .toList();
-        return right(transactions);
-      },
-    );
+      final result = await _dioService.get(
+        '/transactions?user_id=eq.${currentUser.id}&select=*&order=created_at.desc&limit=$limit',
+      );
+
+      return result.fold(
+        (failure) => left(failure),
+        (response) {
+          if (response.data is! List) {
+            return left(Failure('Invalid response format'));
+          }
+          final transactions = (response.data as List)
+              .map((json) => TransactionModel.fromJson(json as Map<String, dynamic>))
+              .toList();
+          return right(transactions);
+        },
+      );
+    } catch (e) {
+      return left(Failure(e.toString()));
+    }
   }
 
   @override
@@ -53,25 +76,44 @@ class WalletRepositoryImpl implements WalletRepository {
     required double amount,
     required String description,
   }) async {
-    final result = await _dioService.post(
-      '/rest/v1/transactions',
-      data: {
-        'amount': amount,
-        'type': 'credit',
-        'description': description,
-        'status': 'completed',
-      },
-    );
+    try {
+      final currentUser = Supabase.instance.client.auth.currentUser;
+      
+      if (currentUser == null) {
+        return left(Failure('User not authenticated'));
+      }
 
-    return result.fold(
-      (failure) => left(failure),
-      (response) {
-        final transaction = TransactionModel.fromJson(
-          response.data as Map<String, dynamic>,
-        );
-        return right(transaction);
-      },
-    );
+      final wallet = await getWallet();
+      
+      return await wallet.fold(
+        (failure) => left(failure),
+        (walletData) async {
+          final result = await _dioService.post(
+            '/transactions',
+            data: {
+              'wallet_id': walletData.id,
+              'user_id': currentUser.id,
+              'amount': amount,
+              'type': 'credit',
+              'description': description,
+              'status': 'completed',
+            },
+          );
+
+          return result.fold(
+            (failure) => left(failure),
+            (response) {
+              final transaction = TransactionModel.fromJson(
+                response.data as Map<String, dynamic>,
+              );
+              return right(transaction);
+            },
+          );
+        },
+      );
+    } catch (e) {
+      return left(Failure(e.toString()));
+    }
   }
 
   @override
@@ -79,25 +121,44 @@ class WalletRepositoryImpl implements WalletRepository {
     required double amount,
     required String description,
   }) async {
-    final result = await _dioService.post(
-      '/rest/v1/transactions',
-      data: {
-        'amount': amount,
-        'type': 'debit',
-        'description': description,
-        'status': 'completed',
-      },
-    );
+    try {
+      final currentUser = Supabase.instance.client.auth.currentUser;
+      
+      if (currentUser == null) {
+        return left(Failure('User not authenticated'));
+      }
 
-    return result.fold(
-      (failure) => left(failure),
-      (response) {
-        final transaction = TransactionModel.fromJson(
-          response.data as Map<String, dynamic>,
-        );
-        return right(transaction);
-      },
-    );
+      final wallet = await getWallet();
+      
+      return await wallet.fold(
+        (failure) => left(failure),
+        (walletData) async {
+          final result = await _dioService.post(
+            '/transactions',
+            data: {
+              'wallet_id': walletData.id,
+              'user_id': currentUser.id,
+              'amount': amount,
+              'type': 'debit',
+              'description': description,
+              'status': 'completed',
+            },
+          );
+
+          return result.fold(
+            (failure) => left(failure),
+            (response) {
+              final transaction = TransactionModel.fromJson(
+                response.data as Map<String, dynamic>,
+              );
+              return right(transaction);
+            },
+          );
+        },
+      );
+    } catch (e) {
+      return left(Failure(e.toString()));
+    }
   }
 
   @override
@@ -106,26 +167,45 @@ class WalletRepositoryImpl implements WalletRepository {
     required String recipientEmail,
     required String description,
   }) async {
-    final result = await _dioService.post(
-      '/rest/v1/transactions',
-      data: {
-        'amount': amount,
-        'type': 'transfer',
-        'description': description,
-        'recipient_email': recipientEmail,
-        'status': 'completed',
-      },
-    );
+    try {
+      final currentUser = Supabase.instance.client.auth.currentUser;
+      
+      if (currentUser == null) {
+        return left(Failure('User not authenticated'));
+      }
 
-    return result.fold(
-      (failure) => left(failure),
-      (response) {
-        final transaction = TransactionModel.fromJson(
-          response.data as Map<String, dynamic>,
-        );
-        return right(transaction);
-      },
-    );
+      final wallet = await getWallet();
+      
+      return await wallet.fold(
+        (failure) => left(failure),
+        (walletData) async {
+          final result = await _dioService.post(
+            '/transactions',
+            data: {
+              'wallet_id': walletData.id,
+              'user_id': currentUser.id,
+              'amount': amount,
+              'type': 'transfer',
+              'description': description,
+              'recipient_email': recipientEmail,
+              'status': 'completed',
+            },
+          );
+
+          return result.fold(
+            (failure) => left(failure),
+            (response) {
+              final transaction = TransactionModel.fromJson(
+                response.data as Map<String, dynamic>,
+              );
+              return right(transaction);
+            },
+          );
+        },
+      );
+    } catch (e) {
+      return left(Failure(e.toString()));
+    }
   }
 
   @override
@@ -133,24 +213,43 @@ class WalletRepositoryImpl implements WalletRepository {
     required double amount,
     required String description,
   }) async {
-    final result = await _dioService.post(
-      '/rest/v1/transactions',
-      data: {
-        'amount': amount,
-        'type': 'credit',
-        'description': description,
-        'status': 'completed',
-      },
-    );
+    try {
+      final currentUser = Supabase.instance.client.auth.currentUser;
+      
+      if (currentUser == null) {
+        return left(Failure('User not authenticated'));
+      }
 
-    return result.fold(
-      (failure) => left(failure),
-      (response) {
-        final transaction = TransactionModel.fromJson(
-          response.data as Map<String, dynamic>,
-        );
-        return right(transaction);
-      },
-    );
+      final wallet = await getWallet();
+      
+      return await wallet.fold(
+        (failure) => left(failure),
+        (walletData) async {
+          final result = await _dioService.post(
+            '/transactions',
+            data: {
+              'wallet_id': walletData.id,
+              'user_id': currentUser.id,
+              'amount': amount,
+              'type': 'credit',
+              'description': description,
+              'status': 'completed',
+            },
+          );
+
+          return result.fold(
+            (failure) => left(failure),
+            (response) {
+              final transaction = TransactionModel.fromJson(
+                response.data as Map<String, dynamic>,
+              );
+              return right(transaction);
+            },
+          );
+        },
+      );
+    } catch (e) {
+      return left(Failure(e.toString()));
+    }
   }
 }
