@@ -18,7 +18,7 @@ class WalletRepositoryImpl implements WalletRepository {
       final currentUser = Supabase.instance.client.auth.currentUser;
       
       if (currentUser == null) {
-        return left(Failure('User not authenticated'));
+        return left(ServerFailure('User not authenticated'));
       }
 
       final result = await _dioService.get(
@@ -29,7 +29,7 @@ class WalletRepositoryImpl implements WalletRepository {
         (failure) => left(failure),
         (response) {
           if (response.data is! List || (response.data as List).isEmpty) {
-            return left(Failure('No wallet found'));
+            return left(ServerFailure('No wallet found'));
           }
           final data = (response.data as List).first as Map<String, dynamic>;
           final wallet = WalletModel.fromJson(data);
@@ -37,7 +37,7 @@ class WalletRepositoryImpl implements WalletRepository {
         },
       );
     } catch (e) {
-      return left(Failure(e.toString()));
+      return left(ServerFailure(e.toString()));
     }
   }
 
@@ -47,7 +47,7 @@ class WalletRepositoryImpl implements WalletRepository {
       final currentUser = Supabase.instance.client.auth.currentUser;
       
       if (currentUser == null) {
-        return left(Failure('User not authenticated'));
+        return left(ServerFailure('User not authenticated'));
       }
 
       final result = await _dioService.get(
@@ -58,7 +58,7 @@ class WalletRepositoryImpl implements WalletRepository {
         (failure) => left(failure),
         (response) {
           if (response.data is! List) {
-            return left(Failure('Invalid response format'));
+            return left(ServerFailure('Invalid response format'));
           }
           final transactions = (response.data as List)
               .map((json) => TransactionModel.fromJson(json as Map<String, dynamic>))
@@ -67,7 +67,7 @@ class WalletRepositoryImpl implements WalletRepository {
         },
       );
     } catch (e) {
-      return left(Failure(e.toString()));
+      return left(ServerFailure(e.toString()));
     }
   }
 
@@ -80,7 +80,7 @@ class WalletRepositoryImpl implements WalletRepository {
       final currentUser = Supabase.instance.client.auth.currentUser;
       
       if (currentUser == null) {
-        return left(Failure('User not authenticated'));
+        return left(ServerFailure('User not authenticated'));
       }
 
       final wallet = await getWallet();
@@ -112,7 +112,7 @@ class WalletRepositoryImpl implements WalletRepository {
         },
       );
     } catch (e) {
-      return left(Failure(e.toString()));
+      return left(ServerFailure(e.toString()));
     }
   }
 
@@ -125,7 +125,7 @@ class WalletRepositoryImpl implements WalletRepository {
       final currentUser = Supabase.instance.client.auth.currentUser;
       
       if (currentUser == null) {
-        return left(Failure('User not authenticated'));
+        return left(ServerFailure('User not authenticated'));
       }
 
       final wallet = await getWallet();
@@ -157,7 +157,7 @@ class WalletRepositoryImpl implements WalletRepository {
         },
       );
     } catch (e) {
-      return left(Failure(e.toString()));
+      return left(ServerFailure(e.toString()));
     }
   }
 
@@ -171,7 +171,7 @@ class WalletRepositoryImpl implements WalletRepository {
       final currentUser = Supabase.instance.client.auth.currentUser;
       
       if (currentUser == null) {
-        return left(Failure('User not authenticated'));
+        return left(ServerFailure('User not authenticated'));
       }
 
       final wallet = await getWallet();
@@ -204,7 +204,7 @@ class WalletRepositoryImpl implements WalletRepository {
         },
       );
     } catch (e) {
-      return left(Failure(e.toString()));
+      return left(ServerFailure(e.toString()));
     }
   }
 
@@ -217,7 +217,7 @@ class WalletRepositoryImpl implements WalletRepository {
       final currentUser = Supabase.instance.client.auth.currentUser;
       
       if (currentUser == null) {
-        return left(Failure('User not authenticated'));
+        return left(ServerFailure('User not authenticated'));
       }
 
       final wallet = await getWallet();
@@ -249,7 +249,7 @@ class WalletRepositoryImpl implements WalletRepository {
         },
       );
     } catch (e) {
-      return left(Failure(e.toString()));
+      return left(ServerFailure(e.toString()));
     }
   }
 }
