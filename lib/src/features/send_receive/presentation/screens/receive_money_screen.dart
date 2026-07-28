@@ -11,8 +11,8 @@ class ReceiveMoneyScreen extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final cs = context.theme.colorScheme;
-    final tt = context.theme.textTheme;
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
     final currentUser = Supabase.instance.client.auth.currentUser;
 
     if (currentUser == null) {
@@ -94,7 +94,7 @@ class ReceiveMoneyScreen extends HookConsumerWidget {
                 borderRadius: BorderRadius.circular(16.r),
                 border: Border.all(color: cs.outline.withOpacity(0.2)),
               ),
-              child: QrImage(
+              child: QrImageView(
                 data: accountId,
                 version: QrVersions.auto,
                 size: 250.w,
