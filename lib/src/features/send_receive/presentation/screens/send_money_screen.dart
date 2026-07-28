@@ -279,11 +279,14 @@ class _ConfirmTransferStep extends StatelessWidget {
         ),
         SizedBox(height: AppSpacing.xl.h),
         if (selectedRecipient != null)
-          TransferSummaryCard(
-            recipientName: selectedRecipient!.name ?? selectedRecipient!.email,
-            recipientEmail: selectedRecipient!.email,
-            amount: double.tryParse(amountController.text) ?? 0,
-            description: noteController.text.isEmpty ? 'No note' : noteController.text,
+          ListenableBuilder(
+            listenable: Listenable.merge([amountController, noteController]),
+            builder: (context, _) => TransferSummaryCard(
+              recipientName: selectedRecipient!.name ?? selectedRecipient!.email,
+              recipientEmail: selectedRecipient!.email,
+              amount: double.tryParse(amountController.text) ?? 0,
+              description: noteController.text.isEmpty ? 'No note' : noteController.text,
+            ),
           ),
         SizedBox(height: AppSpacing.xl.h),
         Row(
