@@ -1,24 +1,11 @@
 import '../../imports/imports.dart';
 
 /// A themed card widget with consistent padding, radius, and optional header.
-///
-/// Usage:
-/// ```dart
-/// AppCard(
-///   child: Text('Card content'),
-/// )
-///
-/// // With a header
-/// AppCard(
-///   title: 'Recent Transactions',
-///   trailing: TextButton(onPressed: _seeAll, child: const Text('See all')),
-///   child: TransactionList(),
-/// )
-/// ```
+/// If no child is provided, it shows a default empty message.
 class AppCard extends StatelessWidget {
   const AppCard({
     super.key,
-    required this.child,
+    this.child,
     this.title,
     this.subtitle,
     this.leading,
@@ -28,9 +15,10 @@ class AppCard extends StatelessWidget {
     this.onTap,
     this.showShadow = false,
     this.color,
+    this.emptyMessage = "No data available", // Default message
   });
 
-  final Widget child;
+  final Widget? child;
   final String? title;
   final String? subtitle;
   final Widget? leading;
@@ -42,6 +30,9 @@ class AppCard extends StatelessWidget {
   /// When true, uses [AppShadows.card] instead of a border outline.
   final bool showShadow;
   final Color? color;
+
+  /// Message shown when no child is provided.
+  final String emptyMessage;
 
   @override
   Widget build(BuildContext context) {
@@ -98,7 +89,12 @@ class AppCard extends StatelessWidget {
                 AppSpacing.md,
                 AppSpacing.md,
               ),
-          child: child,
+          // If child is null, show the emptyMessage instead of blank space
+          child: child ??
+              Text(
+                emptyMessage,
+                style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+              ),
         ),
       ],
     );
