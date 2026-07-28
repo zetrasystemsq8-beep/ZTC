@@ -10,6 +10,7 @@ import 'src/imports/core_imports.dart';
 import 'src/app.dart';
 import 'src/config/app_config.dart';
 import 'src/routing/app_router.dart';
+import 'src/theme/theme.dart'; // adjust path to wherever buildLightTheme/buildDarkTheme live
 
 Future<void> main() async {
   final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
@@ -73,10 +74,6 @@ class MyApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Watching (not just reading) goRouterProvider matters here: it's what
-    // lets GoRouter's own refreshListenable pick up authProvider changes
-    // and re-run the redirect logic (login -> awaitingOtp -> authenticated)
-    // without this widget needing to rebuild the whole router itself.
     final appRouter = ref.watch(goRouterProvider);
 
     return ScreenUtilInit(
@@ -85,11 +82,9 @@ class MyApp extends ConsumerWidget {
         return MaterialApp.router(
           title: 'ztc_bank',
           debugShowCheckedModeBanner: false,
-          theme: ThemeData(useMaterial3: true),
-          darkTheme: ThemeData(
-            useMaterial3: true,
-            brightness: Brightness.dark,
-          ),
+          // TODO: replace '#6750A4' with your real brand hex if you have one
+          theme: buildLightTheme(primaryColorHex: '#6750A4'),
+          darkTheme: buildDarkTheme(primaryColorHex: '#6750A4'),
           themeMode: ThemeMode.system,
           localizationsDelegates: context.localizationDelegates,
           supportedLocales: context.supportedLocales,
