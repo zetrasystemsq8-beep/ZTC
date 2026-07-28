@@ -1,4 +1,3 @@
-// lib/src/app.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -8,15 +7,13 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:ztc_bank/src/imports/core_imports.dart';
 import 'package:ztc_bank/src/imports/packages_imports.dart';
 import 'package:ztc_bank/src/routing/app_router.dart';
+import 'package:ztc_bank/src/theme/theme.dart'; // adjust path
 
 class App extends ConsumerWidget {
   const App({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Watching (not reading) goRouterProvider so GoRouter's
-    // refreshListenable can react to authProvider changes and re-run the
-    // redirect logic (login -> awaitingOtp -> authenticated) live.
     final appRouter = ref.watch(goRouterProvider);
 
     final current = _buildMaterialApp(context, appRouter);
@@ -27,8 +24,8 @@ class App extends ConsumerWidget {
     return MaterialApp.router(
       title: 'ztc_bank',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(useMaterial3: true),
-      darkTheme: ThemeData(useMaterial3: true, brightness: Brightness.dark),
+      theme: buildLightTheme(primaryColorHex: '#6750A4'),
+      darkTheme: buildDarkTheme(primaryColorHex: '#6750A4'),
       themeMode: ThemeMode.system,
       routerConfig: router,
       localizationsDelegates: context.localizationDelegates,
