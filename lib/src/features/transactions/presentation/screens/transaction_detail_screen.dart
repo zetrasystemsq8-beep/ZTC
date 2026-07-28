@@ -15,8 +15,8 @@ class TransactionDetailScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final transactionAsyncValue = ref.watch(singleTransactionProvider(transactionId));
-    final cs = context.theme.colorScheme;
-    final tt = context.theme.textTheme;
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
 
     return Scaffold(
       backgroundColor: cs.surface,
@@ -67,8 +67,8 @@ class _TransactionHeaderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = context.theme.colorScheme;
-    final tt = context.theme.textTheme;
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
 
     final isCredit = transaction.type == TransactionType.credit;
     final icon = _getIconForType(transaction.type);
@@ -158,8 +158,7 @@ class _DetailsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tt = context.theme.textTheme;
-    final cs = context.theme.colorScheme;
+    final tt = Theme.of(context).textTheme;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -216,8 +215,8 @@ class _DetailRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tt = context.theme.textTheme;
-    final cs = context.theme.colorScheme;
+    final tt = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
 
     return Padding(
       padding: EdgeInsets.symmetric(vertical: AppSpacing.md.h),
@@ -248,7 +247,7 @@ class _AdditionalInfoSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tt = context.theme.textTheme;
+    final tt = Theme.of(context).textTheme;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
