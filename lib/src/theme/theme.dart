@@ -178,31 +178,30 @@ ThemeData _buildTheme(ColorScheme colorScheme, AppColorsExtension customColors) 
     ),
 
     // Input Decoration Theme
-    inputDecorationTheme: InputDecorationTheme(
-      filled: true,
-      fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        
-        borderSide: BorderSide(color: colorScheme.outline),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: colorScheme.outline),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: colorScheme.primary, width: 2),
-      ),
-      errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: colorScheme.error),
-      ),
-      floatingLabelStyle: TextStyle(color: colorScheme.primary),
-      labelStyle: textTheme.labelMedium?.copyWith(color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
-      hintStyle: textTheme.labelMedium?.copyWith(color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
-    ),
-
+    // Input Decoration Theme
+inputDecorationTheme: InputDecorationTheme(
+  filled: true,
+  fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.8),
+  border: OutlineInputBorder(
+    borderRadius: BorderRadius.circular(12),
+    borderSide: BorderSide(color: colorScheme.outline),
+  ),
+  enabledBorder: OutlineInputBorder(
+    borderRadius: BorderRadius.circular(12),
+    borderSide: BorderSide(color: colorScheme.outline),
+  ),
+  focusedBorder: OutlineInputBorder(
+    borderRadius: BorderRadius.circular(12),
+    borderSide: BorderSide(color: colorScheme.primary, width: 2),
+  ),
+  errorBorder: OutlineInputBorder(
+    borderRadius: BorderRadius.circular(12),
+    borderSide: BorderSide(color: colorScheme.error),
+  ),
+  floatingLabelStyle: TextStyle(color: colorScheme.primary),
+  labelStyle: textTheme.labelMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+  hintStyle: textTheme.labelMedium?.copyWith(color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7)),
+),
     // Navigation Bar Theme
     navigationBarTheme: NavigationBarThemeData(
       backgroundColor: colorScheme.surface,
