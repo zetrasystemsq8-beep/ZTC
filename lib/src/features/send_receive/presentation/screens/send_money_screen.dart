@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// Shows a styled, floating snackbar instead of the default gray Material one.
+import 'package:ztc_bank/src/features/wallet/presentation/providers/wallet_provider.dart';
+
 void _showAppSnackBar(
   BuildContext context, {
   required String message,
@@ -78,67 +78,44 @@ class SendMoneyScreen extends HookConsumerWidget {
       final zetraId = recipientIdController.text.trim();
 
       if (zetraId.isEmpty) {
-        _showAppSnackBar(
-          context,
-          message: "Enter recipient's Zetra ID",
-          type: _SnackType.error,
-        );
+        _showAppSnackBar(context, message: "Enter recipient's Zetra ID", type: _SnackType.error);
         return;
       }
 
       final amount = double.tryParse(amountController.text);
       if (amount == null || amount <= 0) {
-        _showAppSnackBar(
-          context,
-          message: 'Enter a valid amount',
-          type: _SnackType.error,
-        );
+        _showAppSnackBar(context, message: 'Enter a valid amount', type: _SnackType.error);
         return;
       }
 
       isLoading.value = true;
 
-      try {
-        await Supabase.instance.client.from('transactions').insert({
-          'user_id': Supabase.instance.client.auth.currentUser?.id,
-          'amount': amount,
-          'type': 'transfer',
-          'description': noteController.text.isEmpty ? 'Transfer' : noteController.text,
-          // NOTE: your `transactions` table must have this column.
-          // Rename below to match whatever column actually exists
-          // (e.g. recipient_zetra_id / recipient_account_id).
-          'recipient_account_id': zetraId,
-          'status': 'completed',
-        });
+      // Goes through WalletNotifier.send() -> repository.send() -> the
+      // transfer_cp RPC, which atomically debits the sender's wallet and
+      // credits the recipient's wallet in one DB transaction.
+      await ref.read(walletProvider.notifier).send(
+            amount,
+            zetraId,
+            noteController.text.isEmpty ? 'Transfer' : noteController.text,
+          );
 
-        if (context.mounted) {
-          _showAppSnackBar(
-            context,
-            message: 'Transfer sent successfully!',
-            type: _SnackType.success,
-          );
-          Future.delayed(const Duration(seconds: 1), () {
-            if (context.mounted) Navigator.pop(context);
-          });
-        }
-      } on PostgrestException catch (e) {
-        if (context.mounted) {
-          _showAppSnackBar(
-            context,
-            message: e.message,
-            type: _SnackType.error,
-          );
-        }
-      } catch (e) {
-        if (context.mounted) {
-          _showAppSnackBar(
-            context,
-            message: 'Something went wrong. Please try again.',
-            type: _SnackType.error,
-          );
-        }
-      } finally {
-        isLoading.value = false;
+      isLoading.value = false;
+
+      final walletState = ref.read(walletProvider);
+
+      if (context.mounted) {
+        walletState.when(
+          data: (_) {
+            _showAppSnackBar(context, message: 'Transfer sent successfully!', type: _SnackType.success);
+            Future.delayed(const Duration(seconds: 1), () {
+              if (context.mounted) Navigator.pop(context);
+            });
+          },
+          error: (error, _) {
+            _showAppSnackBar(context, message: error.toString(), type: _SnackType.error);
+          },
+          loading: () {},
+        );
       }
     }
 
@@ -155,24 +132,14 @@ class SendMoneyScreen extends HookConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Step Indicator
             Row(
               children: [
                 Container(
                   height: 40.w,
                   width: 40.w,
-                  decoration: BoxDecoration(
-                    color: cs.primary,
-                    shape: BoxShape.circle,
-                  ),
+                  decoration: BoxDecoration(color: cs.primary, shape: BoxShape.circle),
                   child: Center(
-                    child: Text(
-                      '1',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                    child: Text('1', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                   ),
                 ),
                 Expanded(
@@ -206,19 +173,14 @@ class SendMoneyScreen extends HookConsumerWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Recipient Details',
-                    style: tt.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-                  ),
+                  Text('Recipient Details', style: tt.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
                   SizedBox(height: 16.h),
                   TextField(
                     controller: recipientIdController,
                     decoration: InputDecoration(
                       labelText: "Recipient's Zetra ID",
-                      hintText: 'e.g. ZTC-9792-7364-4875',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12.r),
-                      ),
+                      hintText: 'e.g. ZTR-100020',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r)),
                       prefixIcon: const Icon(Icons.badge_outlined),
                     ),
                     textCapitalization: TextCapitalization.characters,
@@ -228,9 +190,7 @@ class SendMoneyScreen extends HookConsumerWidget {
                     controller: amountController,
                     decoration: InputDecoration(
                       labelText: 'Amount (CP)',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12.r),
-                      ),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r)),
                       prefixIcon: const Icon(Icons.currency_pound),
                     ),
                     keyboardType: TextInputType.number,
@@ -240,9 +200,7 @@ class SendMoneyScreen extends HookConsumerWidget {
                     controller: noteController,
                     decoration: InputDecoration(
                       labelText: 'Note (Optional)',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12.r),
-                      ),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r)),
                       prefixIcon: const Icon(Icons.note_outlined),
                     ),
                     maxLines: 3,
@@ -254,20 +212,12 @@ class SendMoneyScreen extends HookConsumerWidget {
                     child: ElevatedButton(
                       onPressed: () {
                         if (recipientIdController.text.trim().isEmpty) {
-                          _showAppSnackBar(
-                            context,
-                            message: "Enter recipient's Zetra ID",
-                            type: _SnackType.error,
-                          );
+                          _showAppSnackBar(context, message: "Enter recipient's Zetra ID", type: _SnackType.error);
                           return;
                         }
                         final amount = double.tryParse(amountController.text);
                         if (amount == null || amount <= 0) {
-                          _showAppSnackBar(
-                            context,
-                            message: 'Enter a valid amount',
-                            type: _SnackType.error,
-                          );
+                          _showAppSnackBar(context, message: 'Enter a valid amount', type: _SnackType.error);
                           return;
                         }
                         currentStep.value = 1;
@@ -281,10 +231,7 @@ class SendMoneyScreen extends HookConsumerWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Confirm Transfer',
-                    style: tt.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-                  ),
+                  Text('Confirm Transfer', style: tt.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
                   SizedBox(height: 24.h),
                   Container(
                     padding: EdgeInsets.all(20.w),
@@ -299,10 +246,7 @@ class SendMoneyScreen extends HookConsumerWidget {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text('Recipient', style: tt.bodyMedium),
-                            Text(
-                              recipientIdController.text,
-                              style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
-                            ),
+                            Text(recipientIdController.text, style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.bold)),
                           ],
                         ),
                         SizedBox(height: 12.h),
@@ -310,10 +254,7 @@ class SendMoneyScreen extends HookConsumerWidget {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text('Amount', style: tt.bodyMedium),
-                            Text(
-                              '${amountController.text} CP',
-                              style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
-                            ),
+                            Text('${amountController.text} CP', style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.bold)),
                           ],
                         ),
                         SizedBox(height: 12.h),
@@ -335,9 +276,7 @@ class SendMoneyScreen extends HookConsumerWidget {
                     children: [
                       Expanded(
                         child: OutlinedButton(
-                          onPressed: isLoading.value
-                              ? null
-                              : () => currentStep.value = 0,
+                          onPressed: isLoading.value ? null : () => currentStep.value = 0,
                           child: const Text('Back'),
                         ),
                       ),
@@ -346,11 +285,7 @@ class SendMoneyScreen extends HookConsumerWidget {
                         child: ElevatedButton(
                           onPressed: isLoading.value ? null : handleSend,
                           child: isLoading.value
-                              ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
-                                )
+                              ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
                               : const Text('Send'),
                         ),
                       ),
