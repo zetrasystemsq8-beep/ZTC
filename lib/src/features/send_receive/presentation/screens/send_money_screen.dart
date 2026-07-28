@@ -4,12 +4,68 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+/// Shows a styled, floating snackbar instead of the default gray Material one.
+void _showAppSnackBar(
+  BuildContext context, {
+  required String message,
+  _SnackType type = _SnackType.info,
+}) {
+  final theme = Theme.of(context);
+  final Color bg;
+  final IconData icon;
+
+  switch (type) {
+    case _SnackType.success:
+      bg = const Color(0xFF1E7C4A);
+      icon = Icons.check_circle_rounded;
+      break;
+    case _SnackType.error:
+      bg = const Color(0xFFB3261E);
+      icon = Icons.error_rounded;
+      break;
+    case _SnackType.info:
+      bg = theme.colorScheme.primary;
+      icon = Icons.info_rounded;
+      break;
+  }
+
+  ScaffoldMessenger.of(context).hideCurrentSnackBar();
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: bg,
+      elevation: 6,
+      margin: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14.r)),
+      duration: const Duration(seconds: 3),
+      content: Row(
+        children: [
+          Icon(icon, color: Colors.white, size: 20.sp),
+          SizedBox(width: 10.w),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: 14.sp,
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+enum _SnackType { success, error, info }
+
 class SendMoneyScreen extends HookConsumerWidget {
   const SendMoneyScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final recipientEmailController = useTextEditingController();
+    final recipientIdController = useTextEditingController();
     final amountController = useTextEditingController();
     final noteController = useTextEditingController();
     final isLoading = useState(false);
@@ -19,17 +75,23 @@ class SendMoneyScreen extends HookConsumerWidget {
     final tt = Theme.of(context).textTheme;
 
     Future<void> handleSend() async {
-      if (recipientEmailController.text.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Enter recipient email')),
+      final zetraId = recipientIdController.text.trim();
+
+      if (zetraId.isEmpty) {
+        _showAppSnackBar(
+          context,
+          message: "Enter recipient's Zetra ID",
+          type: _SnackType.error,
         );
         return;
       }
 
       final amount = double.tryParse(amountController.text);
       if (amount == null || amount <= 0) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Enter a valid amount')),
+        _showAppSnackBar(
+          context,
+          message: 'Enter a valid amount',
+          type: _SnackType.error,
         );
         return;
       }
@@ -42,22 +104,37 @@ class SendMoneyScreen extends HookConsumerWidget {
           'amount': amount,
           'type': 'transfer',
           'description': noteController.text.isEmpty ? 'Transfer' : noteController.text,
-          'recipient_email': recipientEmailController.text,
+          // NOTE: your `transactions` table must have this column.
+          // Rename below to match whatever column actually exists
+          // (e.g. recipient_zetra_id / recipient_account_id).
+          'recipient_account_id': zetraId,
           'status': 'completed',
         });
 
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Transfer sent successfully!')),
+          _showAppSnackBar(
+            context,
+            message: 'Transfer sent successfully!',
+            type: _SnackType.success,
           );
           Future.delayed(const Duration(seconds: 1), () {
-            Navigator.pop(context);
+            if (context.mounted) Navigator.pop(context);
           });
+        }
+      } on PostgrestException catch (e) {
+        if (context.mounted) {
+          _showAppSnackBar(
+            context,
+            message: e.message,
+            type: _SnackType.error,
+          );
         }
       } catch (e) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: $e')),
+          _showAppSnackBar(
+            context,
+            message: 'Something went wrong. Please try again.',
+            type: _SnackType.error,
           );
         }
       } finally {
@@ -135,15 +212,16 @@ class SendMoneyScreen extends HookConsumerWidget {
                   ),
                   SizedBox(height: 16.h),
                   TextField(
-                    controller: recipientEmailController,
+                    controller: recipientIdController,
                     decoration: InputDecoration(
-                      labelText: 'Recipient Email',
+                      labelText: "Recipient's Zetra ID",
+                      hintText: 'e.g. ZTC-9792-7364-4875',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12.r),
                       ),
-                      prefixIcon: const Icon(Icons.email_outlined),
+                      prefixIcon: const Icon(Icons.badge_outlined),
                     ),
-                    keyboardType: TextInputType.emailAddress,
+                    textCapitalization: TextCapitalization.characters,
                   ),
                   SizedBox(height: 16.h),
                   TextField(
@@ -174,7 +252,26 @@ class SendMoneyScreen extends HookConsumerWidget {
                     width: double.infinity,
                     height: 56.h,
                     child: ElevatedButton(
-                      onPressed: () => currentStep.value = 1,
+                      onPressed: () {
+                        if (recipientIdController.text.trim().isEmpty) {
+                          _showAppSnackBar(
+                            context,
+                            message: "Enter recipient's Zetra ID",
+                            type: _SnackType.error,
+                          );
+                          return;
+                        }
+                        final amount = double.tryParse(amountController.text);
+                        if (amount == null || amount <= 0) {
+                          _showAppSnackBar(
+                            context,
+                            message: 'Enter a valid amount',
+                            type: _SnackType.error,
+                          );
+                          return;
+                        }
+                        currentStep.value = 1;
+                      },
                       child: const Text('Review Transfer'),
                     ),
                   ),
@@ -203,7 +300,7 @@ class SendMoneyScreen extends HookConsumerWidget {
                           children: [
                             Text('Recipient', style: tt.bodyMedium),
                             Text(
-                              recipientEmailController.text,
+                              recipientIdController.text,
                               style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
                             ),
                           ],
