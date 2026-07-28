@@ -13,8 +13,8 @@ class TransactionsListScreen extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final searchController = useTextEditingController();
-    final cs = context.theme.colorScheme;
-    final tt = context.theme.textTheme;
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
 
     final transactionsAsyncValue = ref.watch(transactionsListProvider);
     final statsAsyncValue = ref.watch(transactionStatsProvider);
@@ -56,7 +56,6 @@ class TransactionsListScreen extends HookConsumerWidget {
           child: Column(
             children: [
               SizedBox(height: AppSpacing.md.h),
-              // Search Bar
               TransactionSearchBar(
                 controller: searchController,
                 onChanged: (query) {
@@ -68,8 +67,6 @@ class TransactionsListScreen extends HookConsumerWidget {
                 },
               ),
               SizedBox(height: AppSpacing.lg.h),
-
-              // Statistics
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: AppSpacing.lg.w),
                 child: statsAsyncValue.when(
@@ -79,8 +76,6 @@ class TransactionsListScreen extends HookConsumerWidget {
                 ),
               ),
               SizedBox(height: AppSpacing.lg.h),
-
-              // Transactions List
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: AppSpacing.lg.w),
                 child: transactionsAsyncValue.when(
