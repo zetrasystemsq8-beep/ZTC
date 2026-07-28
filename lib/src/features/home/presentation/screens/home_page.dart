@@ -14,8 +14,8 @@ class HomePage extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final cs = context.theme.colorScheme;
-    final tt = context.theme.textTheme;
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
 
     final session = ref.watch(sessionProvider);
     final walletState = ref.watch(walletProvider);
@@ -118,8 +118,7 @@ class _DashboardBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = context.theme.colorScheme;
-    final tt = context.theme.textTheme;
+    final cs = Theme.of(context).colorScheme;
 
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -213,7 +212,7 @@ class _SimpleActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tt = context.theme.textTheme;
+    final tt = Theme.of(context).textTheme;
     return InkWell(
       onTap: onTap,
       borderRadius: AppBorders.lg,
@@ -254,8 +253,8 @@ class _SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = context.theme.colorScheme;
-    final tt = context.theme.textTheme;
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
     return Row(
       children: [
         Expanded(
