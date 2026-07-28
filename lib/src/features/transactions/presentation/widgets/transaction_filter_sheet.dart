@@ -27,8 +27,8 @@ class TransactionFilterSheet extends HookWidget {
     final startDate = useState<DateTime?>(currentFilter.startDate);
     final endDate = useState<DateTime?>(currentFilter.endDate);
 
-    final cs = context.theme.colorScheme;
-    final tt = context.theme.textTheme;
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
 
     return DraggableScrollableSheet(
       expand: false,
@@ -40,7 +40,6 @@ class TransactionFilterSheet extends HookWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -56,7 +55,6 @@ class TransactionFilterSheet extends HookWidget {
                 ),
                 SizedBox(height: AppSpacing.lg.h),
 
-                // Transaction Type
                 Text(
                   'Transaction Type',
                   style: tt.titleSmall?.copyWith(fontWeight: FontWeight.w600),
@@ -77,7 +75,6 @@ class TransactionFilterSheet extends HookWidget {
                 ),
                 SizedBox(height: AppSpacing.lg.h),
 
-                // Transaction Status
                 Text(
                   'Status',
                   style: tt.titleSmall?.copyWith(fontWeight: FontWeight.w600),
@@ -98,7 +95,6 @@ class TransactionFilterSheet extends HookWidget {
                 ),
                 SizedBox(height: AppSpacing.lg.h),
 
-                // Amount Range
                 Text(
                   'Amount Range',
                   style: tt.titleSmall?.copyWith(fontWeight: FontWeight.w600),
@@ -127,7 +123,6 @@ class TransactionFilterSheet extends HookWidget {
                 ),
                 SizedBox(height: AppSpacing.lg.h),
 
-                // Action Buttons
                 Row(
                   children: [
                     Expanded(
