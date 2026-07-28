@@ -13,14 +13,14 @@ class WalletModel extends Wallet {
   factory WalletModel.fromJson(Map<String, dynamic> json) {
     return WalletModel(
       id: json['id'] as String? ?? '',
-      userId: json['userId'] as String? ?? '',
+      userId: json['user_id'] as String? ?? '',
       balance: (json['balance'] as num?)?.toDouble() ?? 0.0,
       currency: json['currency'] as String? ?? 'USD',
-      createdAt: json['createdAt'] != null
-          ? DateTime.parse(json['createdAt'] as String)
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'] as String)
           : DateTime.now(),
-      updatedAt: json['updatedAt'] != null
-          ? DateTime.parse(json['updatedAt'] as String)
+      updatedAt: json['updated_at'] != null
+          ? DateTime.parse(json['updated_at'] as String)
           : DateTime.now(),
     );
   }
@@ -28,11 +28,11 @@ class WalletModel extends Wallet {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'userId': userId,
+      'user_id': userId,
       'balance': balance,
       'currency': currency,
-      'createdAt': createdAt.toIso8601String(),
-      'updatedAt': updatedAt.toIso8601String(),
+      'created_at': createdAt.toIso8601String(),
+      'updated_at': updatedAt.toIso8601String(),
     };
   }
 }
