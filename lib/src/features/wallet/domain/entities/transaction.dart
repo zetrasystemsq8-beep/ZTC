@@ -10,7 +10,7 @@ class Transaction extends Equatable {
   final TransactionType type;
   final TransactionStatus status;
   final String description;
-  final String? recipientEmail;
+  final String? counterpartyZetraId;
   final DateTime timestamp;
 
   const Transaction({
@@ -20,11 +20,10 @@ class Transaction extends Equatable {
     required this.type,
     required this.status,
     required this.description,
-    this.recipientEmail,
+    this.counterpartyZetraId,
     required this.timestamp,
   });
 
-  /// Money coming IN to this wallet (credit or transfer_in) vs OUT (debit or transfer_out).
   bool get isCredit =>
       type == TransactionType.credit || type == TransactionType.transferIn;
 
@@ -36,7 +35,7 @@ class Transaction extends Equatable {
     type,
     status,
     description,
-    recipientEmail,
+    counterpartyZetraId,
     timestamp,
   ];
 }
