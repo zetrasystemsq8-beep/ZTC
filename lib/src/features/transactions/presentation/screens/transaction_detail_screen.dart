@@ -45,21 +45,50 @@ class TransactionDetailScreen extends ConsumerWidget {
                   SizedBox(height: AppSpacing.xl.h),
 
                   // Additional Info
-                  _AdditionalInfoSection(transaction: transaction),
-                  SizedBox(height: AppSpacing.xl.h),
+                  
+class _AdditionalInfoSection extends StatelessWidget {
+  final Transaction transaction;
 
-                  // Action Buttons
-                  _ActionButtons(transaction: transaction),
-                ],
-              ),
+  const _AdditionalInfoSection({required this.transaction});
+
+  @override
+  Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Notes',
+          style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+        ),
+        SizedBox(height: AppSpacing.md.h),
+        AppCard(
+          child: Text(
+            transaction.description.isNotEmpty
+                ? transaction.description
+                : 'No notes provided',
+            style: tt.bodyMedium,
+          ),
+        ),
+        if (transaction.counterpartyZetraId != null) ...[
+          SizedBox(height: AppSpacing.lg.h),
+          Text(
+            transaction.isCredit ? 'From' : 'To',
+            style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          SizedBox(height: AppSpacing.md.h),
+          AppCard(
+            child: Text(
+              transaction.counterpartyZetraId!,
+              style: tt.bodyMedium,
             ),
-          );
-        },
-      ),
+          ),
+        ],
+      ],
     );
   }
 }
-
 class _TransactionHeaderCard extends StatelessWidget {
   final Transaction transaction;
 
