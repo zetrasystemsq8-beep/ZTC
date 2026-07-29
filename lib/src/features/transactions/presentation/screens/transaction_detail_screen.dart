@@ -45,50 +45,21 @@ class TransactionDetailScreen extends ConsumerWidget {
                   SizedBox(height: AppSpacing.xl.h),
 
                   // Additional Info
-                  
-class _AdditionalInfoSection extends StatelessWidget {
-  final Transaction transaction;
+                  _AdditionalInfoSection(transaction: transaction),
+                  SizedBox(height: AppSpacing.xl.h),
 
-  const _AdditionalInfoSection({required this.transaction});
-
-  @override
-  Widget build(BuildContext context) {
-    final tt = Theme.of(context).textTheme;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Notes',
-          style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-        ),
-        SizedBox(height: AppSpacing.md.h),
-        AppCard(
-          child: Text(
-            transaction.description.isNotEmpty
-                ? transaction.description
-                : 'No notes provided',
-            style: tt.bodyMedium,
-          ),
-        ),
-        if (transaction.counterpartyZetraId != null) ...[
-          SizedBox(height: AppSpacing.lg.h),
-          Text(
-            transaction.isCredit ? 'From' : 'To',
-            style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-          ),
-          SizedBox(height: AppSpacing.md.h),
-          AppCard(
-            child: Text(
-              transaction.counterpartyZetraId!,
-              style: tt.bodyMedium,
+                  // Action Buttons
+                  _ActionButtons(transaction: transaction),
+                ],
+              ),
             ),
-          ),
-        ],
-      ],
+          );
+        },
+      ),
     );
   }
 }
+
 class _TransactionHeaderCard extends StatelessWidget {
   final Transaction transaction;
 
@@ -304,19 +275,16 @@ class _AdditionalInfoSection extends StatelessWidget {
             style: tt.bodyMedium,
           ),
         ),
-        // Note: `transactions` has no recipient column in the current
-        // schema, so recipientEmail is always null — this section simply
-        // won't render, which is correct rather than showing a fake value.
-        if (transaction.recipientEmail != null) ...[
+        if (transaction.counterpartyZetraId != null) ...[
           SizedBox(height: AppSpacing.lg.h),
           Text(
-            'Recipient',
+            transaction.isCredit ? 'From' : 'To',
             style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w600),
           ),
           SizedBox(height: AppSpacing.md.h),
           AppCard(
             child: Text(
-              transaction.recipientEmail!,
+              transaction.counterpartyZetraId!,
               style: tt.bodyMedium,
             ),
           ),
