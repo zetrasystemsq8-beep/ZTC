@@ -62,19 +62,21 @@ class WalletNotifier extends StateNotifier<AsyncValue<Wallet>> {
     );
   }
 
-  Future<void> send(double amount, String recipientEmail, String description) async {
+  /// Sends CP to another user. Returns null on success, or an error
+  /// message string on failure. Does NOT touch `state` on failure —
+  /// a failed send should never wreck the dashboard's loaded wallet data.
+  Future<String?> send(double amount, String recipientEmail, String description) async {
     final result = await _repository.send(
       amount: amount,
       recipientEmail: recipientEmail,
       description: description,
     );
 
-    result.fold(
-      (failure) {
-        state = AsyncValue.error(failure.message, StackTrace.current);
-      },
+    return result.fold(
+      (failure) => failure.message,
       (transaction) {
-        fetchWallet();
+        fetchWallet(); // refresh balance in the background
+        return null;
       },
     );
   }
