@@ -26,9 +26,10 @@ class SpendingSummaryCard extends StatelessWidget {
       }
       switch (tx.type) {
         case TransactionType.credit:
+        case TransactionType.transferIn:
           income += tx.amount;
         case TransactionType.debit:
-        case TransactionType.transfer:
+        case TransactionType.transferOut:
           outflow += tx.amount;
       }
     }
