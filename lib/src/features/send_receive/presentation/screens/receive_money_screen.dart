@@ -6,6 +6,15 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+Future<String?> _fetchZetraId(String userId) async {
+  final data = await Supabase.instance.client
+      .from('profiles')
+      .select('zetra_id')
+      .eq('id', userId)
+      .maybeSingle();
+  return data?['zetra_id'] as String?;
+}
+
 class ReceiveMoneyScreen extends HookConsumerWidget {
   const ReceiveMoneyScreen({super.key});
 
@@ -22,7 +31,8 @@ class ReceiveMoneyScreen extends HookConsumerWidget {
       );
     }
 
-    final accountId = 'ZTR-${currentUser.id.substring(0, 6).toUpperCase()}';
+    final zetraIdFuture = useMemoized(() => _fetchZetraId(currentUser.id));
+    final snapshot = useFuture(zetraIdFuture);
 
     return Scaffold(
       backgroundColor: cs.surface,
@@ -33,83 +43,111 @@ class ReceiveMoneyScreen extends HookConsumerWidget {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(24.w),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'Your Account ID',
-              style: tt.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 16.h),
-            Container(
-              padding: EdgeInsets.all(20.w),
-              decoration: BoxDecoration(
-                color: cs.surfaceContainer,
-                borderRadius: BorderRadius.circular(16.r),
-                border: Border.all(color: cs.outline.withOpacity(0.2)),
-              ),
+      body: Builder(builder: (context) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError || snapshot.data == null) {
+          return Center(
+            child: Padding(
+              padding: EdgeInsets.all(24.w),
               child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Container(
-                    padding: EdgeInsets.all(12.w),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12.r),
-                    ),
-                    child: Text(
-                      accountId,
-                      textAlign: TextAlign.center,
-                      style: tt.bodyLarge?.copyWith(
-                        fontFamily: 'Courier',
-                        letterSpacing: 2,
-                        color: Colors.black,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
+                  Icon(Icons.error_outline, color: cs.error, size: 48.sp),
                   SizedBox(height: 12.h),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: () => _copyToClipboard(context, accountId),
-                      icon: const Icon(Icons.copy),
-                      label: const Text('Copy'),
-                    ),
+                  Text(
+                    'Could not load your Zetra ID',
+                    style: tt.bodyLarge,
+                    textAlign: TextAlign.center,
                   ),
                 ],
               ),
             ),
-            SizedBox(height: 32.h),
-            Text(
-              'QR Code',
-              style: tt.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 16.h),
-            Container(
-              padding: EdgeInsets.all(20.w),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16.r),
-                border: Border.all(color: cs.outline.withOpacity(0.2)),
+          );
+        }
+
+        final zetraId = snapshot.data!;
+
+        return SingleChildScrollView(
+          padding: EdgeInsets.all(24.w),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Your Zetra ID',
+                style: tt.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
               ),
-              child: QrImageView(
-                data: accountId,
-                version: QrVersions.auto,
-                size: 250.w,
-                gapless: false,
+              SizedBox(height: 16.h),
+              Container(
+                padding: EdgeInsets.all(20.w),
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainer,
+                  borderRadius: BorderRadius.circular(16.r),
+                  border: Border.all(color: cs.outline.withOpacity(0.2)),
+                ),
+                child: Column(
+                  children: [
+                    Container(
+                      padding: EdgeInsets.all(12.w),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12.r),
+                      ),
+                      child: Text(
+                        zetraId,
+                        textAlign: TextAlign.center,
+                        style: tt.bodyLarge?.copyWith(
+                          fontFamily: 'Courier',
+                          letterSpacing: 2,
+                          color: Colors.black,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 12.h),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () => _copyToClipboard(context, zetraId),
+                        icon: const Icon(Icons.copy),
+                        label: const Text('Copy'),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            SizedBox(height: 24.h),
-            Text(
-              'Share this ID or QR code so others can send you CP.',
-              textAlign: TextAlign.center,
-              style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
-            ),
-          ],
-        ),
-      ),
+              SizedBox(height: 32.h),
+              Text(
+                'QR Code',
+                style: tt.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 16.h),
+              Container(
+                padding: EdgeInsets.all(20.w),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16.r),
+                  border: Border.all(color: cs.outline.withOpacity(0.2)),
+                ),
+                child: QrImageView(
+                  data: zetraId,
+                  version: QrVersions.auto,
+                  size: 250.w,
+                  gapless: false,
+                ),
+              ),
+              SizedBox(height: 24.h),
+              Text(
+                'Share this ID or QR code so others can send you CP.',
+                textAlign: TextAlign.center,
+                style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+              ),
+            ],
+          ),
+        );
+      }),
     );
   }
 
