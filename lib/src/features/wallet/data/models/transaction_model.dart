@@ -15,14 +15,17 @@ class TransactionModel extends Transaction {
   factory TransactionModel.fromJson(Map<String, dynamic> json) {
     return TransactionModel(
       id: json['id'] as String? ?? '',
-      walletId: json['walletId'] as String? ?? '',
+      walletId: json['wallet_id'] as String? ?? '',
       amount: (json['amount'] as num?)?.toDouble() ?? 0.0,
       type: _parseTransactionType(json['type']),
-      status: _parseTransactionStatus(json['status']),
+      // `transactions` has no status column — every row that exists was
+      // written only after a successful transfer_cp call or a successful
+      // deposit/withdraw insert, so it's always completed.
+      status: TransactionStatus.completed,
       description: json['description'] as String? ?? '',
-      recipientEmail: json['recipientEmail'] as String?,
-      timestamp: json['timestamp'] != null
-          ? DateTime.parse(json['timestamp'] as String)
+      recipientEmail: null, // not stored on this table
+      timestamp: json['created_at'] != null
+          ? DateTime.parse(json['created_at'] as String)
           : DateTime.now(),
     );
   }
@@ -30,33 +33,39 @@ class TransactionModel extends Transaction {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'walletId': walletId,
+      'wallet_id': walletId,
       'amount': amount,
-      'type': type.toString().split('.').last,
-      'status': status.toString().split('.').last,
+      'type': _typeToDb(type),
       'description': description,
-      'recipientEmail': recipientEmail,
-      'timestamp': timestamp.toIso8601String(),
+      'created_at': timestamp.toIso8601String(),
     };
   }
 
   static TransactionType _parseTransactionType(dynamic value) {
-    if (value is String) {
-      return TransactionType.values.firstWhere(
-        (e) => e.toString().split('.').last == value,
-        orElse: () => TransactionType.transfer,
-      );
+    switch (value) {
+      case 'credit':
+        return TransactionType.credit;
+      case 'debit':
+        return TransactionType.debit;
+      case 'transfer_in':
+        return TransactionType.transferIn;
+      case 'transfer_out':
+        return TransactionType.transferOut;
+      default:
+        return TransactionType.transferOut;
     }
-    return TransactionType.transfer;
   }
 
-  static TransactionStatus _parseTransactionStatus(dynamic value) {
-    if (value is String) {
-      return TransactionStatus.values.firstWhere(
-        (e) => e.toString().split('.').last == value,
-        orElse: () => TransactionStatus.pending,
-      );
+  static String _typeToDb(TransactionType type) {
+    switch (type) {
+      case TransactionType.credit:
+        return 'credit';
+      case TransactionType.debit:
+        return 'debit';
+      case TransactionType.transferIn:
+        return 'transfer_in';
+      case TransactionType.transferOut:
+        return 'transfer_out';
     }
-    return TransactionStatus.pending;
   }
 }
