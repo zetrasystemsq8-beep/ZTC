@@ -15,10 +15,10 @@ class TransactionItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = context.theme.colorScheme;
-    final tt = context.theme.textTheme;
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
 
-    final isCredit = transaction.type == TransactionType.credit;
+    final isCredit = transaction.isCredit;
     final icon = _getIconForType(transaction.type);
     final color = isCredit ? Colors.green : Colors.red;
 
@@ -64,7 +64,7 @@ class TransactionItem extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  '${isCredit ? '+' : '-'} \$${transaction.amount.toStringAsFixed(2)}',
+                  '${isCredit ? '+' : '-'} ${transaction.amount.toStringAsFixed(2)} CP',
                   style: tt.bodyMedium?.copyWith(
                     color: color,
                     fontWeight: FontWeight.w600,
@@ -99,8 +99,9 @@ class TransactionItem extends StatelessWidget {
   IconData _getIconForType(TransactionType type) {
     return switch (type) {
       TransactionType.credit => IconsaxPlusLinear.arrow_down,
+      TransactionType.transferIn => IconsaxPlusLinear.arrow_down,
       TransactionType.debit => IconsaxPlusLinear.arrow_up,
-      TransactionType.transfer => IconsaxPlusLinear.import,
+      TransactionType.transferOut => IconsaxPlusLinear.arrow_up,
     };
   }
 
