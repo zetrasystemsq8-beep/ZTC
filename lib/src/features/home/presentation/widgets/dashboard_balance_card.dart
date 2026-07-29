@@ -1,11 +1,21 @@
 import 'package:ztc_bank/src/imports/core_imports.dart';
 import 'package:ztc_bank/src/imports/packages_imports.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:ztc_bank/src/features/wallet/domain/entities/wallet.dart';
 import 'package:ztc_bank/src/services/copy_service.dart';
 
-/// Premium balance card with hide/show, ZTC account number, copy and QR actions.
-class DashboardBalanceCard extends StatelessWidget {
+Future<String?> _fetchZetraId(String userId) async {
+  final data = await Supabase.instance.client
+      .from('profiles')
+      .select('zetra_id')
+      .eq('id', userId)
+      .maybeSingle();
+  return data?['zetra_id'] as String?;
+}
+
+/// Premium balance card with hide/show, real Zetra ID, copy and QR actions.
+class DashboardBalanceCard extends StatefulWidget {
   const DashboardBalanceCard({
     super.key,
     required this.wallet,
@@ -21,16 +31,22 @@ class DashboardBalanceCard extends StatelessWidget {
   final VoidCallback onShowQr;
   final VoidCallback? onTap;
 
-  /// Deterministic mocked account number derived from the wallet id.
-  /// Format: ZTC-XXXX-XXXX-XXXX. Ready to be replaced by a backend value.
-  String get accountNumber {
-    final digits = wallet.id.replaceAll(RegExp('[^0-9]'), '');
-    final padded = (digits + '000000000000').substring(0, 12);
-    return 'ZTC-${padded.substring(0, 4)}-${padded.substring(4, 8)}-${padded.substring(8, 12)}';
+  @override
+  State<DashboardBalanceCard> createState() => _DashboardBalanceCardState();
+}
+
+class _DashboardBalanceCardState extends State<DashboardBalanceCard> {
+  late final Future<String?> _zetraIdFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+    _zetraIdFuture = userId != null ? _fetchZetraId(userId) : Future.value(null);
   }
 
   String _formatBalance() {
-    final value = wallet.balance;
+    final value = widget.wallet.balance;
     final whole = value.truncate();
     final fraction = ((value - whole) * 100).round().abs().toString().padLeft(2, '0');
     final wholeStr = whole
@@ -39,7 +55,7 @@ class DashboardBalanceCard extends StatelessWidget {
     return '$wholeStr.$fraction';
   }
 
-  Future<void> _copyAccount(BuildContext context) async {
+  Future<void> _copyAccount(BuildContext context, String accountNumber) async {
     await CopyService.instance.copy(accountNumber);
     if (!context.mounted) return;
     context.showTypedSnackBar(
@@ -57,7 +73,7 @@ class DashboardBalanceCard extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: onTap,
+        onTap: widget.onTap,
         borderRadius: AppBorders.lg,
         child: Ink(
           decoration: BoxDecoration(
@@ -97,13 +113,13 @@ class DashboardBalanceCard extends StatelessWidget {
                     ),
                     const Spacer(),
                     _IconChip(
-                      icon: isHidden
+                      icon: widget.isHidden
                           ? IconsaxPlusLinear.eye_slash
                           : IconsaxPlusLinear.eye,
-                      tooltip: isHidden
+                      tooltip: widget.isHidden
                           ? 'home.show_balance'.tr()
                           : 'home.hide_balance'.tr(),
-                      onTap: onToggleHidden,
+                      onTap: widget.onToggleHidden,
                       foreground: onCard,
                     ),
                   ],
@@ -113,7 +129,7 @@ class DashboardBalanceCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      wallet.currency,
+                      widget.wallet.currency,
                       style: tt.titleMedium?.copyWith(
                         color: onCard.withValues(alpha: 0.85),
                         fontWeight: FontWeight.w600,
@@ -128,8 +144,8 @@ class DashboardBalanceCard extends StatelessWidget {
                           child: child,
                         ),
                         child: Text(
-                          isHidden ? '••••••' : _formatBalance(),
-                          key: ValueKey(isHidden),
+                          widget.isHidden ? '••••••' : _formatBalance(),
+                          key: ValueKey(widget.isHidden),
                           style: tt.displaySmall?.copyWith(
                             color: onCard,
                             fontWeight: FontWeight.w800,
@@ -141,64 +157,73 @@ class DashboardBalanceCard extends StatelessWidget {
                   ],
                 ),
                 SizedBox(height: AppSpacing.lg.h),
-                Container(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: AppSpacing.md.w,
-                    vertical: AppSpacing.sm.h,
-                  ),
-                  decoration: BoxDecoration(
-                    color: onCard.withValues(alpha: 0.12),
-                    borderRadius: AppBorders.md,
-                    border: Border.all(
-                      color: onCard.withValues(alpha: 0.18),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        IconsaxPlusLinear.card,
-                        size: 18.sp,
-                        color: onCard.withValues(alpha: 0.9),
+                FutureBuilder<String?>(
+                  future: _zetraIdFuture,
+                  builder: (context, snapshot) {
+                    final accountNumber = snapshot.data ?? '—';
+
+                    return Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: AppSpacing.md.w,
+                        vertical: AppSpacing.sm.h,
                       ),
-                      SizedBox(width: 8.w),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'home.account_number'.tr(),
-                              style: tt.labelSmall?.copyWith(
-                                color: onCard.withValues(alpha: 0.7),
-                                letterSpacing: 0.4,
-                              ),
-                            ),
-                            Text(
-                              accountNumber,
-                              style: tt.bodyMedium?.copyWith(
-                                color: onCard,
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: 0.6,
-                              ),
-                            ),
-                          ],
+                      decoration: BoxDecoration(
+                        color: onCard.withValues(alpha: 0.12),
+                        borderRadius: AppBorders.md,
+                        border: Border.all(
+                          color: onCard.withValues(alpha: 0.18),
                         ),
                       ),
-                      _IconChip(
-                        icon: IconsaxPlusLinear.copy,
-                        tooltip: 'home.copy_account'.tr(),
-                        onTap: () => _copyAccount(context),
-                        foreground: onCard,
+                      child: Row(
+                        children: [
+                          Icon(
+                            IconsaxPlusLinear.card,
+                            size: 18.sp,
+                            color: onCard.withValues(alpha: 0.9),
+                          ),
+                          SizedBox(width: 8.w),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'home.account_number'.tr(),
+                                  style: tt.labelSmall?.copyWith(
+                                    color: onCard.withValues(alpha: 0.7),
+                                    letterSpacing: 0.4,
+                                  ),
+                                ),
+                                Text(
+                                  accountNumber,
+                                  style: tt.bodyMedium?.copyWith(
+                                    color: onCard,
+                                    fontWeight: FontWeight.w600,
+                                    letterSpacing: 0.6,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          _IconChip(
+                            icon: IconsaxPlusLinear.copy,
+                            tooltip: 'home.copy_account'.tr(),
+                            onTap: snapshot.data == null
+                                ? () {}
+                                : () => _copyAccount(context, snapshot.data!),
+                            foreground: onCard,
+                          ),
+                          SizedBox(width: 6.w),
+                          _IconChip(
+                            icon: IconsaxPlusLinear.scan_barcode,
+                            tooltip: 'home.show_qr'.tr(),
+                            onTap: widget.onShowQr,
+                            foreground: onCard,
+                          ),
+                        ],
                       ),
-                      SizedBox(width: 6.w),
-                      _IconChip(
-                        icon: IconsaxPlusLinear.scan_barcode,
-                        tooltip: 'home.show_qr'.tr(),
-                        onTap: onShowQr,
-                        foreground: onCard,
-                      ),
-                    ],
-                  ),
+                    );
+                  },
                 ),
               ],
             ),
