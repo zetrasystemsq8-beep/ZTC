@@ -199,7 +199,7 @@ class SendMoneyScreen extends HookConsumerWidget {
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12.r),
                       ),
-                      prefixIcon: const Icon(Icons.currency_pound),
+                      prefixIcon: const Icon(Icons.monetization_on_outlined),
                     ),
                     keyboardType: TextInputType.number,
                   ),
