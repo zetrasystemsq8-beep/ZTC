@@ -8,7 +8,7 @@ class TransactionModel extends Transaction {
     required super.type,
     required super.status,
     required super.description,
-    super.recipientEmail,
+    super.counterpartyZetraId,
     required super.timestamp,
   });
 
@@ -18,12 +18,9 @@ class TransactionModel extends Transaction {
       walletId: json['wallet_id'] as String? ?? '',
       amount: (json['amount'] as num?)?.toDouble() ?? 0.0,
       type: _parseTransactionType(json['type']),
-      // `transactions` has no status column — every row that exists was
-      // written only after a successful transfer_cp call or a successful
-      // deposit/withdraw insert, so it's always completed.
       status: TransactionStatus.completed,
       description: json['description'] as String? ?? '',
-      recipientEmail: null, // not stored on this table
+      counterpartyZetraId: json['counterparty_zetra_id'] as String?,
       timestamp: json['created_at'] != null
           ? DateTime.parse(json['created_at'] as String)
           : DateTime.now(),
@@ -37,6 +34,7 @@ class TransactionModel extends Transaction {
       'amount': amount,
       'type': _typeToDb(type),
       'description': description,
+      'counterparty_zetra_id': counterpartyZetraId,
       'created_at': timestamp.toIso8601String(),
     };
   }
