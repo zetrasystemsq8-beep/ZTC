@@ -1,6 +1,6 @@
 import 'package:equatable/equatable.dart';
 
-enum TransactionType { credit, debit, transfer }
+enum TransactionType { credit, debit, transferIn, transferOut }
 enum TransactionStatus { pending, completed, failed }
 
 class Transaction extends Equatable {
@@ -23,6 +23,10 @@ class Transaction extends Equatable {
     this.recipientEmail,
     required this.timestamp,
   });
+
+  /// Money coming IN to this wallet (credit or transfer_in) vs OUT (debit or transfer_out).
+  bool get isCredit =>
+      type == TransactionType.credit || type == TransactionType.transferIn;
 
   @override
   List<Object?> get props => [
