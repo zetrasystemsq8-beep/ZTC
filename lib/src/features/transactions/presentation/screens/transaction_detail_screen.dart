@@ -70,7 +70,7 @@ class _TransactionHeaderCard extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
 
-    final isCredit = transaction.type == TransactionType.credit;
+    final isCredit = transaction.isCredit;
     final icon = _getIconForType(transaction.type);
     final color = isCredit ? Colors.green : Colors.red;
 
@@ -97,7 +97,7 @@ class _TransactionHeaderCard extends StatelessWidget {
           ),
           SizedBox(height: AppSpacing.sm.h),
           Text(
-            '${isCredit ? '+' : '-'} \$${transaction.amount.toStringAsFixed(2)}',
+            '${isCredit ? '+' : '-'} ${transaction.amount.toStringAsFixed(2)} CP',
             style: tt.headlineMedium?.copyWith(
               color: color,
               fontWeight: FontWeight.bold,
@@ -129,8 +129,9 @@ class _TransactionHeaderCard extends StatelessWidget {
   IconData _getIconForType(TransactionType type) {
     return switch (type) {
       TransactionType.credit => IconsaxPlusLinear.arrow_down,
+      TransactionType.transferIn => IconsaxPlusLinear.arrow_down,
       TransactionType.debit => IconsaxPlusLinear.arrow_up,
-      TransactionType.transfer => IconsaxPlusLinear.import,
+      TransactionType.transferOut => IconsaxPlusLinear.arrow_up,
     };
   }
 
@@ -178,7 +179,7 @@ class _DetailsSection extends StatelessWidget {
               AppDivider(indent: 0, endIndent: 0),
               _DetailRow(
                 label: 'Type',
-                value: transaction.type.toString().split('.').last,
+                value: _typeLabel(transaction.type),
               ),
               AppDivider(indent: 0, endIndent: 0),
               _DetailRow(
@@ -188,7 +189,7 @@ class _DetailsSection extends StatelessWidget {
               AppDivider(indent: 0, endIndent: 0),
               _DetailRow(
                 label: 'Amount',
-                value: '\$${transaction.amount.toStringAsFixed(2)}',
+                value: '${transaction.amount.toStringAsFixed(2)} CP',
               ),
               AppDivider(indent: 0, endIndent: 0),
               _DetailRow(
@@ -200,6 +201,15 @@ class _DetailsSection extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  String _typeLabel(TransactionType type) {
+    return switch (type) {
+      TransactionType.credit => 'Credit',
+      TransactionType.debit => 'Debit',
+      TransactionType.transferIn => 'Transfer In',
+      TransactionType.transferOut => 'Transfer Out',
+    };
   }
 
   String _formatDateTime(DateTime dateTime) {
@@ -265,18 +275,22 @@ class _AdditionalInfoSection extends StatelessWidget {
             style: tt.bodyMedium,
           ),
         ),
-        if (transaction.recipientEmail != null) ...[SizedBox(height: AppSpacing.lg.h),
-        Text(
-          'Recipient',
-          style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-        ),
-        SizedBox(height: AppSpacing.md.h),
-        AppCard(
-          child: Text(
-            transaction.recipientEmail!,
-            style: tt.bodyMedium,
+        // Note: `transactions` has no recipient column in the current
+        // schema, so recipientEmail is always null — this section simply
+        // won't render, which is correct rather than showing a fake value.
+        if (transaction.recipientEmail != null) ...[
+          SizedBox(height: AppSpacing.lg.h),
+          Text(
+            'Recipient',
+            style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w600),
           ),
-        ),
+          SizedBox(height: AppSpacing.md.h),
+          AppCard(
+            child: Text(
+              transaction.recipientEmail!,
+              style: tt.bodyMedium,
+            ),
+          ),
         ],
       ],
     );
