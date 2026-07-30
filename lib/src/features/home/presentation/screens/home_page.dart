@@ -1,6 +1,6 @@
 import 'package:ztc_bank/src/imports/core_imports.dart';
 import 'package:ztc_bank/src/imports/packages_imports.dart';
-
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:ztc_bank/src/features/auth/presentation/providers/session_provider.dart';
 import 'package:ztc_bank/src/features/wallet/domain/entities/transaction.dart';
 import 'package:ztc_bank/src/features/wallet/domain/entities/wallet.dart';
@@ -267,13 +267,29 @@ class _SectionHeader extends StatelessWidget {
           ),
         ),
         if (actionLabel != null && onAction != null)
-          TextButton(
-            onPressed: onAction,
-            style: TextButton.styleFrom(
-              padding: EdgeInsets.symmetric(horizontal: AppSpacing.sm.w),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
+  TextButton(
+    onPressed: onAction,
+    style: TextButton.styleFrom(
+      padding: EdgeInsets.symmetric(horizontal: AppSpacing.sm.w),
+      minimumSize: Size.zero,
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    ),
+    child: Text(actionLabel!),
+  ),
+TextButton(
+  onPressed: () async {
+    await Supabase.instance.client.auth.signOut();
+    if (context.mounted) {
+      context.go('/login');
+    }
+  },
+  style: TextButton.styleFrom(
+    padding: EdgeInsets.symmetric(horizontal: AppSpacing.sm.w),
+    minimumSize: Size.zero,
+    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+  ),
+  child: const Text('Logout'),
+),
             child: Text(
               actionLabel!,
               style: tt.labelLarge?.copyWith(
