@@ -267,6 +267,40 @@ class _SectionHeader extends StatelessWidget {
           ),
         ),
         if (actionLabel != null && onAction != null)
+          TextButton(
+            onPressed: onAction,
+            style: TextButton.styleFrom(
+              padding: EdgeInsets.symmetric(horizontal: AppSpacing.sm.w),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Text(
+              actionLabel!,
+              style: tt.labelLarge?.copyWith(
+                color: cs.primary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        TextButton(
+          onPressed: () async {
+            await Supabase.instance.client.auth.signOut();
+            if (context.mounted) {
+              context.go('/login');
+            }
+          },
+          style: TextButton.styleFrom(
+            padding: EdgeInsets.symmetric(horizontal: AppSpacing.sm.w),
+            minimumSize: Size.zero,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+          child: const Text('Logout'),
+        ),
+      ],
+    );
+  }
+}
+        if (actionLabel != null && onAction != null)
   TextButton(
     onPressed: onAction,
     style: TextButton.styleFrom(
