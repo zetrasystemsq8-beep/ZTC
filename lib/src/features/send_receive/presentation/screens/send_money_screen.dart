@@ -4,6 +4,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import 'package:ztc_bank/src/features/wallet/presentation/providers/wallet_provider.dart';
+import 'package:ztc_bank/src/utils/cp_format.dart';
 
 void _showAppSnackBar(
   BuildContext context, {
@@ -70,9 +71,18 @@ class SendMoneyScreen extends HookConsumerWidget {
     final noteController = useTextEditingController();
     final isLoading = useState(false);
     final currentStep = useState(0); // 0 = enter details, 1 = confirm
+    final inputUnit = useState(CpInputUnit.cp);
 
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
+
+    /// Always resolves the typed amount into real CP, regardless of which
+    /// unit the user is currently typing in.
+    double? _resolveCpAmount() {
+      final raw = double.tryParse(amountController.text);
+      if (raw == null) return null;
+      return inputUnit.value == CpInputUnit.cp ? raw : CpFormat.centsToCp(raw.round().toDouble());
+    }
 
     Future<void> handleSend() async {
       final zetraId = recipientIdController.text.trim();
@@ -82,8 +92,8 @@ class SendMoneyScreen extends HookConsumerWidget {
         return;
       }
 
-      final amount = double.tryParse(amountController.text);
-      if (amount == null || amount <= 0) {
+      final cpAmount = _resolveCpAmount();
+      if (cpAmount == null || cpAmount <= 0) {
         _showAppSnackBar(context, message: 'Enter a valid amount', type: _SnackType.error);
         return;
       }
@@ -91,7 +101,7 @@ class SendMoneyScreen extends HookConsumerWidget {
       isLoading.value = true;
 
       final errorMessage = await ref.read(walletProvider.notifier).send(
-            amount,
+            cpAmount,
             zetraId,
             noteController.text.isEmpty ? 'Transfer' : noteController.text,
           );
@@ -192,17 +202,58 @@ class SendMoneyScreen extends HookConsumerWidget {
                     textCapitalization: TextCapitalization.characters,
                   ),
                   SizedBox(height: 16.h),
-                  TextField(
-                    controller: amountController,
-                    decoration: InputDecoration(
-                      labelText: 'Amount (CP)',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12.r),
-                      ),
-                      prefixIcon: const Icon(Icons.monetization_on_outlined),
-                    ),
-                    keyboardType: TextInputType.number,
+
+                  // Amount + unit toggle
+                  Text(
+                    'Amount',
+                    style: tt.labelLarge?.copyWith(color: cs.onSurfaceVariant),
                   ),
+                  SizedBox(height: 8.h),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: amountController,
+                          decoration: InputDecoration(
+                            hintText: inputUnit.value == CpInputUnit.cp ? '0.00' : '0',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12.r),
+                            ),
+                            prefixIcon: const Icon(Icons.monetization_on_outlined),
+                          ),
+                          keyboardType: TextInputType.number,
+                          onChanged: (_) {
+                            // Trigger a rebuild so the "≈" conversion hint updates live.
+                            (context as Element).markNeedsBuild();
+                          },
+                        ),
+                      ),
+                      SizedBox(width: 8.w),
+                      SegmentedButton<CpInputUnit>(
+                        segments: const [
+                          ButtonSegment(value: CpInputUnit.cp, label: Text('CP')),
+                          ButtonSegment(value: CpInputUnit.cent, label: Text('Cent')),
+                        ],
+                        selected: {inputUnit.value},
+                        onSelectionChanged: (selection) {
+                          inputUnit.value = selection.first;
+                        },
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 6.h),
+                  Builder(builder: (context) {
+                    final cpAmount = _resolveCpAmount();
+                    if (cpAmount == null || cpAmount <= 0) return const SizedBox.shrink();
+                    return Text(
+                      inputUnit.value == CpInputUnit.cp
+                          ? '≈ ${CpFormat.displayCents(cpAmount)}'
+                          : '≈ ${CpFormat.displayCp(cpAmount)}',
+                      style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                    );
+                  }),
+
                   SizedBox(height: 16.h),
                   TextField(
                     controller: noteController,
@@ -225,8 +276,8 @@ class SendMoneyScreen extends HookConsumerWidget {
                           _showAppSnackBar(context, message: "Enter recipient's Zetra ID", type: _SnackType.error);
                           return;
                         }
-                        final amount = double.tryParse(amountController.text);
-                        if (amount == null || amount <= 0) {
+                        final cpAmount = _resolveCpAmount();
+                        if (cpAmount == null || cpAmount <= 0) {
                           _showAppSnackBar(context, message: 'Enter a valid amount', type: _SnackType.error);
                           return;
                         }
@@ -270,10 +321,13 @@ class SendMoneyScreen extends HookConsumerWidget {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text('Amount', style: tt.bodyMedium),
-                            Text(
-                              '${amountController.text} CP',
-                              style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
-                            ),
+                            Builder(builder: (context) {
+                              final cpAmount = _resolveCpAmount() ?? 0;
+                              return Text(
+                                CpFormat.displayBoth(cpAmount),
+                                style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                              );
+                            }),
                           ],
                         ),
                         SizedBox(height: 12.h),
