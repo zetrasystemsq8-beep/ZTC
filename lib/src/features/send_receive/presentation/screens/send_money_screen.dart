@@ -155,7 +155,7 @@ class SendMoneyScreen extends HookConsumerWidget {
     double? resolveCpAmount() {
       final raw = double.tryParse(amountController.text);
       if (raw == null) return null;
-      return inputUnit.value == CpInputUnit.cp ? raw : CpFormat.centsToCp(raw.round().toDouble());
+      return inputUnit.value == CpInputUnit.cp ? raw : CpFormat.centsToCp(raw.round());
     }
 
     Future<void> handleSend() async {
