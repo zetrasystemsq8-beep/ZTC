@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:ztc_bank/src/features/wallet/presentation/providers/wallet_provider.dart';
 import 'package:ztc_bank/src/utils/cp_format.dart';
@@ -61,38 +64,108 @@ void _showAppSnackBar(
 
 enum _SnackType { success, error, info }
 
+class _RecipientMatch {
+  final String id;
+  final String zetraId;
+  final String? zetramail;
+  final String? username;
+  final String? fullName;
+
+  const _RecipientMatch({
+    required this.id,
+    required this.zetraId,
+    this.zetramail,
+    this.username,
+    this.fullName,
+  });
+
+  String get displayLabel => fullName ?? username ?? zetramail ?? zetraId;
+  String get displaySubLabel => zetraId;
+}
+
+Future<List<_RecipientMatch>> _searchRecipients(String query) async {
+  if (query.trim().isEmpty) return [];
+
+  final data = await Supabase.instance.client.rpc(
+    'search_profiles',
+    params: {'search_query': query},
+  );
+
+  return (data as List)
+      .map((row) => _RecipientMatch(
+            id: row['id'] as String,
+            zetraId: row['zetra_id'] as String,
+            zetramail: row['zetramail'] as String?,
+            username: row['username'] as String?,
+            fullName: row['full_name'] as String?,
+          ))
+      .toList();
+}
+
 class SendMoneyScreen extends HookConsumerWidget {
   const SendMoneyScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final recipientIdController = useTextEditingController();
+    final searchController = useTextEditingController();
     final amountController = useTextEditingController();
     final noteController = useTextEditingController();
     final isLoading = useState(false);
     final currentStep = useState(0); // 0 = enter details, 1 = confirm
     final inputUnit = useState(CpInputUnit.cp);
 
+    final selectedRecipient = useState<_RecipientMatch?>(null);
+    final searchResults = useState<List<_RecipientMatch>>([]);
+    final isSearching = useState(false);
+    final debounce = useRef<Timer?>(null);
+
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
 
-    /// Always resolves the typed amount into real CP, regardless of which
-    /// unit the user is currently typing in.
-    double? _resolveCpAmount() {
+    void onSearchChanged(String query) {
+      if (selectedRecipient.value != null) {
+        selectedRecipient.value = null;
+      }
+
+      debounce.value?.cancel();
+      if (query.trim().isEmpty) {
+        searchResults.value = [];
+        return;
+      }
+
+      debounce.value = Timer(const Duration(milliseconds: 350), () async {
+        isSearching.value = true;
+        try {
+          final results = await _searchRecipients(query);
+          searchResults.value = results;
+        } catch (_) {
+          searchResults.value = [];
+        } finally {
+          isSearching.value = false;
+        }
+      });
+    }
+
+    void selectRecipient(_RecipientMatch match) {
+      selectedRecipient.value = match;
+      searchController.text = match.displayLabel;
+      searchResults.value = [];
+    }
+
+    double? resolveCpAmount() {
       final raw = double.tryParse(amountController.text);
       if (raw == null) return null;
       return inputUnit.value == CpInputUnit.cp ? raw : CpFormat.centsToCp(raw.round().toDouble());
     }
 
     Future<void> handleSend() async {
-      final zetraId = recipientIdController.text.trim();
-
-      if (zetraId.isEmpty) {
-        _showAppSnackBar(context, message: "Enter recipient's Zetra ID", type: _SnackType.error);
+      final recipient = selectedRecipient.value;
+      if (recipient == null) {
+        _showAppSnackBar(context, message: 'Select a recipient from the search results', type: _SnackType.error);
         return;
       }
 
-      final cpAmount = _resolveCpAmount();
+      final cpAmount = resolveCpAmount();
       if (cpAmount == null || cpAmount <= 0) {
         _showAppSnackBar(context, message: 'Enter a valid amount', type: _SnackType.error);
         return;
@@ -102,7 +175,7 @@ class SendMoneyScreen extends HookConsumerWidget {
 
       final errorMessage = await ref.read(walletProvider.notifier).send(
             cpAmount,
-            zetraId,
+            recipient.zetraId,
             noteController.text.isEmpty ? 'Transfer' : noteController.text,
           );
 
@@ -133,7 +206,6 @@ class SendMoneyScreen extends HookConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Step Indicator
             Row(
               children: [
                 Container(
@@ -190,20 +262,51 @@ class SendMoneyScreen extends HookConsumerWidget {
                   ),
                   SizedBox(height: 16.h),
                   TextField(
-                    controller: recipientIdController,
+                    controller: searchController,
+                    onChanged: onSearchChanged,
                     decoration: InputDecoration(
-                      labelText: "Recipient's Zetra ID",
-                      hintText: 'e.g. ZTR-100020',
+                      labelText: 'Search Zetra ID, ZetraMail, or name',
+                      hintText: 'Start typing to search',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12.r),
                       ),
-                      prefixIcon: const Icon(Icons.badge_outlined),
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: isSearching.value
+                          ? Padding(
+                              padding: EdgeInsets.all(12.w),
+                              child: SizedBox(
+                                width: 16.w,
+                                height: 16.w,
+                                child: const CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                            )
+                          : (selectedRecipient.value != null
+                              ? const Icon(Icons.check_circle, color: Colors.green)
+                              : null),
                     ),
-                    textCapitalization: TextCapitalization.characters,
                   ),
+                  if (searchResults.value.isNotEmpty) ...[
+                    SizedBox(height: 8.h),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: cs.surfaceContainer,
+                        borderRadius: BorderRadius.circular(12.r),
+                        border: Border.all(color: cs.outline.withOpacity(0.2)),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: searchResults.value.map((match) {
+                          return ListTile(
+                            leading: const Icon(Icons.person_outline),
+                            title: Text(match.displayLabel),
+                            subtitle: Text(match.displaySubLabel),
+                            onTap: () => selectRecipient(match),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ],
                   SizedBox(height: 16.h),
-
-                  // Amount + unit toggle
                   Text(
                     'Amount',
                     style: tt.labelLarge?.copyWith(color: cs.onSurfaceVariant),
@@ -224,7 +327,6 @@ class SendMoneyScreen extends HookConsumerWidget {
                           ),
                           keyboardType: TextInputType.number,
                           onChanged: (_) {
-                            // Trigger a rebuild so the "≈" conversion hint updates live.
                             (context as Element).markNeedsBuild();
                           },
                         ),
@@ -244,7 +346,7 @@ class SendMoneyScreen extends HookConsumerWidget {
                   ),
                   SizedBox(height: 6.h),
                   Builder(builder: (context) {
-                    final cpAmount = _resolveCpAmount();
+                    final cpAmount = resolveCpAmount();
                     if (cpAmount == null || cpAmount <= 0) return const SizedBox.shrink();
                     return Text(
                       inputUnit.value == CpInputUnit.cp
@@ -253,7 +355,6 @@ class SendMoneyScreen extends HookConsumerWidget {
                       style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                     );
                   }),
-
                   SizedBox(height: 16.h),
                   TextField(
                     controller: noteController,
@@ -272,11 +373,11 @@ class SendMoneyScreen extends HookConsumerWidget {
                     height: 56.h,
                     child: ElevatedButton(
                       onPressed: () {
-                        if (recipientIdController.text.trim().isEmpty) {
-                          _showAppSnackBar(context, message: "Enter recipient's Zetra ID", type: _SnackType.error);
+                        if (selectedRecipient.value == null) {
+                          _showAppSnackBar(context, message: 'Select a recipient from the search results', type: _SnackType.error);
                           return;
                         }
-                        final cpAmount = _resolveCpAmount();
+                        final cpAmount = resolveCpAmount();
                         if (cpAmount == null || cpAmount <= 0) {
                           _showAppSnackBar(context, message: 'Enter a valid amount', type: _SnackType.error);
                           return;
@@ -311,8 +412,19 @@ class SendMoneyScreen extends HookConsumerWidget {
                           children: [
                             Text('Recipient', style: tt.bodyMedium),
                             Text(
-                              recipientIdController.text,
+                              selectedRecipient.value?.displayLabel ?? '',
                               style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 4.h),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('Zetra ID', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                            Text(
+                              selectedRecipient.value?.zetraId ?? '',
+                              style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                             ),
                           ],
                         ),
@@ -322,7 +434,7 @@ class SendMoneyScreen extends HookConsumerWidget {
                           children: [
                             Text('Amount', style: tt.bodyMedium),
                             Builder(builder: (context) {
-                              final cpAmount = _resolveCpAmount() ?? 0;
+                              final cpAmount = resolveCpAmount() ?? 0;
                               return Text(
                                 CpFormat.displayBoth(cpAmount),
                                 style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
