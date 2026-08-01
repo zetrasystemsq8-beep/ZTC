@@ -1,3 +1,5 @@
+// lib/src/routing/app_router.dart
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,6 +14,7 @@ import '../features/transactions/presentation/screens/transactions_list_screen.d
 import '../features/transactions/presentation/screens/transaction_detail_screen.dart';
 import '../features/send_receive/presentation/screens/send_money_screen.dart';
 import '../features/send_receive/presentation/screens/receive_money_screen.dart';
+import '../features/linked_apps/linked_apps.dart';
 
 class _GoRouterRefreshNotifier extends ChangeNotifier {
   _GoRouterRefreshNotifier(Ref ref) {
@@ -87,8 +90,17 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.receiveMoney,
         builder: (context, state) => const ReceiveMoneyScreen(),
       ),
-      // No AppRoutes.signup / AppRoutes.forgotPassword routes —
-      // Zetra-login-only client. Constants kept for future use.
+      GoRoute(
+        path: '/linked-apps',
+        builder: (context, state) => const LinkedAppsScreen(),
+      ),
+      GoRoute(
+        path: '/app-send/:appId',
+        builder: (context, state) {
+          final appId = state.pathParameters['appId']!;
+          return AppSendMoneyScreen(appId: appId);
+        },
+      ),
     ],
   );
 });
