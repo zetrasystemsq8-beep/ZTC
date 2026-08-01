@@ -75,9 +75,13 @@ class LinkedAppsScreen extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final cs = context.theme.colorScheme;
-    final tt = context.theme.textTheme;
+    // CHANGE THIS:
+final cs = context.theme.colorScheme;
+final tt = context.theme.textTheme;
 
+// TO THIS:
+final cs = Theme.of(context).colorScheme;
+final tt = Theme.of(context).textTheme;
     final apps = [
       {
         'id': 'naijalearn',
