@@ -8,7 +8,7 @@ import 'package:ztc_bank/src/features/wallet/presentation/providers/wallet_provi
 import 'package:ztc_bank/src/features/wallet/presentation/widgets/recent_transactions.dart';
 import 'package:ztc_bank/src/features/home/presentation/widgets/home_widgets.dart';
 import 'package:ztc_bank/src/services/copy_service.dart';
-
+import '../features/linked_apps/linked_apps.dart';
 class HomePage extends HookConsumerWidget {
   const HomePage({super.key});
 
@@ -136,7 +136,16 @@ class _DashboardBody extends StatelessWidget {
           onShowQr: onReceive,
           onTap: onReceive,
         ),
-        SizedBox(height: AppSpacing.lg.h),
+        SizedBox(width: AppSpacing.md.w),
+    Expanded(
+      child: _SimpleActionButton(
+        icon: IconsaxPlusBold.send_2,
+        label: 'Apps',
+        onTap: () => context.push('/linked-apps'),
+        color: cs.tertiary,
+      ),
+    ),
+     SizedBox(height: AppSpacing.lg.h),
         Row(
           children: [
             Expanded(
