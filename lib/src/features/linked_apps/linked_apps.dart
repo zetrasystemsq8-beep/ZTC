@@ -75,13 +75,9 @@ class LinkedAppsScreen extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // CHANGE THIS:
-final cs = context.theme.colorScheme;
-final tt = context.theme.textTheme;
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
 
-// TO THIS:
-final cs = Theme.of(context).colorScheme;
-final tt = Theme.of(context).textTheme;
     final apps = [
       {
         'id': 'naijalearn',
@@ -177,8 +173,8 @@ class AppSendMoneyScreen extends HookConsumerWidget {
     final currentStep = useState(0);
     final recipientData = useState<Map<String, dynamic>?>(null);
 
-    final cs = context.theme.colorScheme;
-    final tt = context.theme.textTheme;
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
 
     final appNames = {
       'naijalearn': 'NaijaLearn',
@@ -236,7 +232,6 @@ class AppSendMoneyScreen extends HookConsumerWidget {
         final currentUser = Supabase.instance.client.auth.currentUser;
         if (currentUser == null) throw Exception('Not authenticated');
 
-        // Get sender's app wallet
         final senderWallet = await ref.read(
           appWalletProvider((appId, currentUser.id)).future,
         );
@@ -250,7 +245,6 @@ class AppSendMoneyScreen extends HookConsumerWidget {
           throw Exception('Insufficient balance');
         }
 
-        // Update sender balance (deduct)
         await Supabase.instance.client
             .from('${appId}_wallets')
             .update({
@@ -259,7 +253,6 @@ class AppSendMoneyScreen extends HookConsumerWidget {
             })
             .eq('user_id', currentUser.id);
 
-        // Update recipient balance (add)
         final recipientId = recipientData.value!['user_id'];
         final recipientBalance = (recipientData.value!['balance_cents'] as int?) ?? 0;
 
@@ -271,7 +264,6 @@ class AppSendMoneyScreen extends HookConsumerWidget {
             })
             .eq('user_id', recipientId);
 
-        // Create transaction record
         await Supabase.instance.client.from('transactions').insert({
           'user_id': currentUser.id,
           'amount': amount,
@@ -320,7 +312,6 @@ class AppSendMoneyScreen extends HookConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Step indicator
             Row(
               children: [
                 Container(
@@ -358,7 +349,6 @@ class AppSendMoneyScreen extends HookConsumerWidget {
               ],
             ),
             SizedBox(height: 32.h),
-
             if (currentStep.value == 0)
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
