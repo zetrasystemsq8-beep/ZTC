@@ -1,20 +1,16 @@
 // lib/src/features/linked_apps/linked_apps.dart
 //
-// "Send to Apps" feature — self-contained. Fixed two bugs from the
-// original version:
-// 1. Recipient lookup now correctly resolves ZetraID -> profiles.id ->
-//    app_currency_balances, instead of searching a nonexistent
-//    "naijalearn_wallets" table using the raw ZetraID text as a user_id
-//    (which is what caused the infinite spinner).
-// 2. Sending money is now a single atomic RPC (transfer_app_currency)
-//    instead of two separate client-side balance updates, so a dropped
-//    connection mid-transfer can never leave money debited from the
-//    sender without reaching the recipient.
+// "Send to Apps" — send either CP (real wallet-to-wallet, via
+// transfer_cp) or an app's own currency (e.g. NaijaLearn Cent, via
+// transfer_app_currency) to another Zetra user, scoped to a chosen app.
 //
-// This file does not call, modify, or depend on transfer_cp,
-// buy_app_currency, spend_app_currency, or credit_app_currency in any
-// way — those remain fully separate and untouched.
+// Recipient lookup uses search_profiles (SECURITY DEFINER RPC) instead
+// of querying `profiles` directly — a direct query is blocked by RLS
+// for anyone else's row and was the original cause of the infinite
+// spinner. Every network call has a 15s timeout so a hang always
+// surfaces as a visible error instead of an endless spinner.
 
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -22,25 +18,27 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-// ==================== PROVIDERS ====================
+// ==================== SHARED MODELS ====================
 
-final appRecipientProvider =
-    FutureProvider.family<Map<String, dynamic>?, (String, String)>(
-  (ref, params) async {
-    final (appId, zetraId) = params;
-    final repo = AppWalletsRepository(appId);
-    return repo.resolveRecipientByZetraId(zetraId);
-  },
-);
+enum SendUnit { cp, cent }
 
-final myAppBalanceProvider = FutureProvider.family<double, String>(
-  (ref, appId) async {
-    final repo = AppWalletsRepository(appId);
-    final userId = Supabase.instance.client.auth.currentUser?.id;
-    if (userId == null) return 0.0;
-    return repo.getBalance(userId);
-  },
-);
+class RecipientMatch {
+  final String userId;
+  final String zetraId;
+  final String? zetramail;
+  final String? username;
+  final String? fullName;
+
+  const RecipientMatch({
+    required this.userId,
+    required this.zetraId,
+    this.zetramail,
+    this.username,
+    this.fullName,
+  });
+
+  String get displayLabel => fullName ?? username ?? zetramail ?? zetraId;
+}
 
 // ==================== REPOSITORY ====================
 
@@ -51,56 +49,59 @@ class AppWalletsRepository {
 
   SupabaseClient get _client => Supabase.instance.client;
 
-  /// Step 1 of sending money: resolve a ZetraID to the account that owns
-  /// it, via the shared `profiles` table (ZetraID is a Zetra-ecosystem
-  /// identifier, not something each app tracks separately).
-  Future<Map<String, dynamic>?> resolveRecipientByZetraId(String zetraId) async {
-    try {
-      final profile = await _client
-          .from('profiles')
-          .select('id, zetra_id, username')
-          .eq('zetra_id', zetraId.trim())
-          .maybeSingle();
+  static const _timeout = Duration(seconds: 15);
 
-      if (profile == null) return null;
+  /// Live search across Zetra ID, ZetraMail, username, and name — same
+  /// safe search_profiles RPC used by ZTC's own Send Money screen.
+  Future<List<RecipientMatch>> searchRecipients(String query) async {
+    if (query.trim().isEmpty) return [];
 
-      final recipientUserId = profile['id'] as String;
-      final balance = await getBalance(recipientUserId);
+    final data = await _client
+        .rpc('search_profiles', params: {'search_query': query})
+        .timeout(_timeout);
 
-      return {
-        'user_id': recipientUserId,
-        'zetra_id': profile['zetra_id'],
-        'username': profile['username'],
-        'balance': balance,
-      };
-    } catch (e) {
-      throw Exception('Failed to resolve recipient: $e');
-    }
+    return (data as List)
+        .map((row) => RecipientMatch(
+              userId: row['id'] as String,
+              zetraId: row['zetra_id'] as String,
+              zetramail: row['zetramail'] as String?,
+              username: row['username'] as String?,
+              fullName: row['full_name'] as String?,
+            ))
+        .toList();
   }
 
-  /// Reads a user's balance for this app from `app_currency_balances`.
-  /// Returns 0 if they have no row yet.
+  /// This app's currency balance for a user. Returns 0 if no row yet.
   Future<double> getBalance(String userId) async {
-    try {
-      final row = await _client
-          .from('app_currency_balances')
-          .select('balance')
-          .eq('user_id', userId)
-          .eq('app_id', appId)
-          .maybeSingle();
+    final row = await _client
+        .from('app_currency_balances')
+        .select('balance')
+        .eq('user_id', userId)
+        .eq('app_id', appId)
+        .maybeSingle()
+        .timeout(_timeout);
 
-      return (row?['balance'] as num?)?.toDouble() ?? 0.0;
-    } catch (e) {
-      throw Exception('Failed to fetch $appId balance: $e');
-    }
+    return (row?['balance'] as num?)?.toDouble() ?? 0.0;
   }
 
-  /// Atomically debits the signed-in user and credits [recipientUserId]
-  /// in one server-side transaction via `transfer_app_currency` — the
-  /// only write path this feature uses. Either both sides complete or
-  /// neither does; there is no window where money leaves one balance
-  /// without reaching the other.
-  Future<void> transferToUser({
+  /// The signed-in user's own wallet id, needed for a CP transfer.
+  Future<String> getMyWalletId() async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) throw Exception('Not signed in');
+
+    final row = await _client
+        .from('wallets')
+        .select('id')
+        .eq('user_id', userId)
+        .single()
+        .timeout(_timeout);
+
+    return row['id'] as String;
+  }
+
+  /// Sends this app's own currency (e.g. NaijaLearn Cent) to another
+  /// user, via the single atomic transfer_app_currency RPC.
+  Future<void> sendAppCurrency({
     required String recipientUserId,
     required double unitAmount,
     String? note,
@@ -110,12 +111,50 @@ class AppWalletsRepository {
       'p_recipient_user_id': recipientUserId,
       'p_unit_amount': unitAmount,
       'p_note': note,
-    });
+    }).timeout(_timeout);
+
     if (!(result is Map && result['success'] == true)) {
       throw Exception('Transfer failed');
     }
   }
+
+  /// Sends real CP from the signed-in user's own wallet, via the same
+  /// secured transfer_cp RPC ZTC's Send Money screen uses.
+  Future<String?> sendCp({
+    required String recipientZetraId,
+    required double cpAmount,
+    String? note,
+  }) async {
+    try {
+      final walletId = await getMyWalletId();
+
+      final result = await _client.rpc('transfer_cp', params: {
+        'p_sender_wallet_id': walletId,
+        'p_recipient_zetra_id': recipientZetraId,
+        'p_amount': cpAmount,
+        'p_description': note?.isEmpty ?? true ? 'Transfer via $appId' : note,
+      }).timeout(_timeout);
+
+      if (result is Map && result['success'] == true) return null;
+      return 'Transfer failed';
+    } on PostgrestException catch (e) {
+      return e.message;
+    } on TimeoutException {
+      return 'Request timed out. Please try again.';
+    } catch (e) {
+      return 'Something went wrong. Please try again.';
+    }
+  }
 }
+
+final myAppBalanceProvider = FutureProvider.family<double, String>(
+  (ref, appId) async {
+    final repo = AppWalletsRepository(appId);
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+    if (userId == null) return 0.0;
+    return repo.getBalance(userId);
+  },
+);
 
 // ==================== SCREENS ====================
 
@@ -128,18 +167,8 @@ class LinkedAppsScreen extends HookConsumerWidget {
     final tt = Theme.of(context).textTheme;
 
     final apps = [
-      {
-        'id': 'naijalearn',
-        'name': 'NaijaLearn',
-        'icon': '🎓',
-        'color': Colors.blue,
-      },
-      {
-        'id': 'nigergram',
-        'name': 'NigerGram',
-        'icon': '📸',
-        'color': Colors.purple,
-      },
+      {'id': 'naijalearn', 'name': 'NaijaLearn', 'icon': '🎓', 'color': Colors.blue},
+      {'id': 'nigergram', 'name': 'NigerGram', 'icon': '📸', 'color': Colors.purple},
     ];
 
     return Scaffold(
@@ -172,31 +201,17 @@ class LinkedAppsScreen extends HookConsumerWidget {
                   borderRadius: BorderRadius.circular(16.r),
                   border: Border.all(color: cs.outline.withOpacity(0.2)),
                   boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
+                    BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2)),
                   ],
                 ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(
-                      app['icon'] as String,
-                      style: TextStyle(fontSize: 48.sp),
-                    ),
+                    Text(app['icon'] as String, style: TextStyle(fontSize: 48.sp)),
                     SizedBox(height: 12.h),
-                    Text(
-                      app['name'] as String,
-                      style: tt.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                      textAlign: TextAlign.center,
-                    ),
+                    Text(app['name'] as String, style: tt.titleMedium?.copyWith(fontWeight: FontWeight.bold), textAlign: TextAlign.center),
                     SizedBox(height: 8.h),
-                    Text(
-                      'Tap to send',
-                      style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                    ),
+                    Text('Tap to send', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
                   ],
                 ),
               ),
@@ -215,121 +230,109 @@ class AppSendMoneyScreen extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final recipientController = useTextEditingController();
+    final searchController = useTextEditingController();
     final amountController = useTextEditingController();
     final noteController = useTextEditingController();
     final isLoading = useState(false);
     final currentStep = useState(0);
-    final recipientData = useState<Map<String, dynamic>?>(null);
+    final sendUnit = useState(SendUnit.cent);
+
+    final selectedRecipient = useState<RecipientMatch?>(null);
+    final searchResults = useState<List<RecipientMatch>>([]);
+    final isSearching = useState(false);
+    final debounce = useRef<Timer?>(null);
+    final error = useState<String?>(null);
 
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
 
-    final appNames = {
-      'naijalearn': 'NaijaLearn',
-      'nigergram': 'NigerGram',
-    };
-
+    final appNames = {'naijalearn': 'NaijaLearn', 'nigergram': 'NigerGram'};
     final repo = AppWalletsRepository(appId);
 
-    Future<void> validateRecipient() async {
-      final zetraId = recipientController.text.trim();
-      if (zetraId.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Enter recipient ZetraID')),
-        );
+    void onSearchChanged(String query) {
+      if (selectedRecipient.value != null) {
+        selectedRecipient.value = null;
+      }
+      error.value = null;
+
+      debounce.value?.cancel();
+      if (query.trim().isEmpty) {
+        searchResults.value = [];
         return;
       }
 
-      final amount = int.tryParse(amountController.text);
-      if (amount == null || amount <= 0) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Enter a valid amount in cents')),
-        );
-        return;
-      }
-
-      isLoading.value = true;
-
-      try {
-        final result = await repo.resolveRecipientByZetraId(zetraId);
-
-        if (result != null) {
-          recipientData.value = result;
-          currentStep.value = 1;
-        } else {
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('No Zetra account found with that ID')),
-            );
-          }
+      debounce.value = Timer(const Duration(milliseconds: 350), () async {
+        isSearching.value = true;
+        try {
+          final results = await repo.searchRecipients(query);
+          searchResults.value = results;
+        } catch (_) {
+          searchResults.value = [];
+        } finally {
+          isSearching.value = false;
         }
-      } catch (e) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: $e')),
-          );
-        }
-      } finally {
-        isLoading.value = false;
-      }
+      });
+    }
+
+    void selectRecipient(RecipientMatch match) {
+      selectedRecipient.value = match;
+      searchController.text = match.displayLabel;
+      searchResults.value = [];
     }
 
     Future<void> handleSend() async {
-      final amount = int.tryParse(amountController.text);
-      if (amount == null || amount <= 0) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Enter a valid amount in cents')),
-        );
+      final recipient = selectedRecipient.value;
+      if (recipient == null) {
+        error.value = 'Select a recipient from the search results';
         return;
       }
 
-      final recipient = recipientData.value;
-      if (recipient == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Recipient not resolved. Go back and try again.')),
-        );
+      final amount = double.tryParse(amountController.text);
+      if (amount == null || amount <= 0) {
+        error.value = 'Enter a valid amount';
+        return;
+      }
+
+      final currentUser = Supabase.instance.client.auth.currentUser;
+      if (currentUser != null && recipient.userId == currentUser.id) {
+        error.value = 'You cannot send to your own account';
         return;
       }
 
       isLoading.value = true;
+      error.value = null;
 
       try {
-        final currentUser = Supabase.instance.client.auth.currentUser;
-        if (currentUser == null) throw Exception('Not authenticated');
-
-        if (recipient['user_id'] == currentUser.id) {
-          throw Exception('You cannot send to your own account');
+        if (sendUnit.value == SendUnit.cent) {
+          await repo.sendAppCurrency(
+            recipientUserId: recipient.userId,
+            unitAmount: amount,
+            note: noteController.text.isEmpty ? null : noteController.text,
+          );
+        } else {
+          final sendError = await repo.sendCp(
+            recipientZetraId: recipient.zetraId,
+            cpAmount: amount,
+            note: noteController.text,
+          );
+          if (sendError != null) {
+            throw Exception(sendError);
+          }
         }
 
-        final unitAmount = amount / 1000.0;
-
-        // Single atomic call — replaces the old two-step manual balance
-        // update entirely.
-        await repo.transferToUser(
-          recipientUserId: recipient['user_id'] as String,
-          unitAmount: unitAmount,
-          note: noteController.text.isEmpty ? null : noteController.text,
-        );
-
         if (context.mounted) {
+          final unitLabel = sendUnit.value == SendUnit.cent ? 'Cent' : 'CP';
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Sent ${(amount / 1000).toStringAsFixed(2)} CP to ${appNames[appId]}',
-              ),
-            ),
+            SnackBar(content: Text('Sent $amount $unitLabel to ${appNames[appId]}')),
           );
           Future.delayed(const Duration(seconds: 1), () {
             if (context.mounted) Navigator.pop(context);
           });
         }
+      } on TimeoutException {
+        error.value = 'Request timed out. Please try again.';
       } catch (e) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: $e')),
-          );
-        }
+        error.value = e.toString().replaceFirst('Exception: ', '');
       } finally {
         isLoading.value = false;
       }
@@ -353,10 +356,7 @@ class AppSendMoneyScreen extends HookConsumerWidget {
                 Container(
                   height: 40.w,
                   width: 40.w,
-                  decoration: BoxDecoration(
-                    color: cs.primary,
-                    shape: BoxShape.circle,
-                  ),
+                  decoration: BoxDecoration(color: cs.primary, shape: BoxShape.circle),
                   child: const Center(child: Text('1', style: TextStyle(color: Colors.white))),
                 ),
                 Expanded(
@@ -374,12 +374,7 @@ class AppSendMoneyScreen extends HookConsumerWidget {
                     shape: BoxShape.circle,
                   ),
                   child: Center(
-                    child: Text(
-                      '2',
-                      style: TextStyle(
-                        color: currentStep.value == 1 ? Colors.white : Colors.grey,
-                      ),
-                    ),
+                    child: Text('2', style: TextStyle(color: currentStep.value == 1 ? Colors.white : Colors.grey)),
                   ),
                 ),
               ],
@@ -389,21 +384,74 @@ class AppSendMoneyScreen extends HookConsumerWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Recipient ZetraID', style: tt.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
+                  Text('Recipient', style: tt.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
                   SizedBox(height: 16.h),
                   TextField(
-                    controller: recipientController,
+                    controller: searchController,
+                    onChanged: onSearchChanged,
                     decoration: InputDecoration(
-                      labelText: 'ZetraID (e.g., ZTR-100020)',
+                      labelText: 'Search Zetra ID, ZetraMail, or name',
+                      hintText: 'Start typing to search',
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r)),
-                      prefixIcon: const Icon(Icons.person),
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: isSearching.value
+                          ? Padding(
+                              padding: EdgeInsets.all(12.w),
+                              child: SizedBox(
+                                width: 16.w,
+                                height: 16.w,
+                                child: const CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                            )
+                          : (selectedRecipient.value != null
+                              ? const Icon(Icons.check_circle, color: Colors.green)
+                              : null),
                     ),
+                  ),
+                  if (searchResults.value.isNotEmpty) ...[
+                    SizedBox(height: 8.h),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: cs.surfaceContainer,
+                        borderRadius: BorderRadius.circular(12.r),
+                        border: Border.all(color: cs.outline.withOpacity(0.2)),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: searchResults.value.map((match) {
+                          return ListTile(
+                            leading: const Icon(Icons.person_outline),
+                            title: Text(match.displayLabel),
+                            subtitle: Text(match.zetraId),
+                            onTap: () => selectRecipient(match),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ],
+                  SizedBox(height: 20.h),
+                  Text('Send as', style: tt.labelLarge?.copyWith(color: cs.onSurfaceVariant)),
+                  SizedBox(height: 8.h),
+                  SegmentedButton<SendUnit>(
+                    segments: const [
+                      ButtonSegment(value: SendUnit.cent, label: Text('Cent'), icon: Icon(Icons.savings_outlined)),
+                      ButtonSegment(value: SendUnit.cp, label: Text('CP'), icon: Icon(Icons.account_balance_wallet_outlined)),
+                    ],
+                    selected: {sendUnit.value},
+                    onSelectionChanged: (s) => sendUnit.value = s.first,
+                  ),
+                  SizedBox(height: 4.h),
+                  Text(
+                    sendUnit.value == SendUnit.cent
+                        ? "Sends directly into the recipient's ${appNames[appId]} balance."
+                        : 'Sends real CP from your Zetra wallet to their wallet.',
+                    style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                   ),
                   SizedBox(height: 16.h),
                   TextField(
                     controller: amountController,
                     decoration: InputDecoration(
-                      labelText: 'Amount (in cents)',
+                      labelText: sendUnit.value == SendUnit.cent ? 'Amount (Cent)' : 'Amount (CP)',
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r)),
                       prefixIcon: const Icon(Icons.money),
                     ),
@@ -419,19 +467,29 @@ class AppSendMoneyScreen extends HookConsumerWidget {
                     ),
                     maxLines: 3,
                   ),
+                  if (error.value != null) ...[
+                    SizedBox(height: 12.h),
+                    Text(error.value!, style: TextStyle(color: cs.error)),
+                  ],
                   SizedBox(height: 32.h),
                   SizedBox(
                     width: double.infinity,
                     height: 56.h,
                     child: ElevatedButton(
-                      onPressed: isLoading.value ? null : validateRecipient,
-                      child: isLoading.value
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                            )
-                          : const Text('Review Transfer'),
+                      onPressed: () {
+                        if (selectedRecipient.value == null) {
+                          error.value = 'Select a recipient from the search results';
+                          return;
+                        }
+                        final amount = double.tryParse(amountController.text);
+                        if (amount == null || amount <= 0) {
+                          error.value = 'Enter a valid amount';
+                          return;
+                        }
+                        error.value = null;
+                        currentStep.value = 1;
+                      },
+                      child: const Text('Review Transfer'),
                     ),
                   ),
                 ],
@@ -455,21 +513,15 @@ class AppSendMoneyScreen extends HookConsumerWidget {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text('To', style: tt.bodyMedium),
-                            Text(
-                              recipientData.value?['username'] as String? ?? recipientController.text,
-                              style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
-                            ),
+                            Text(selectedRecipient.value?.displayLabel ?? '', style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.bold)),
                           ],
                         ),
-                        SizedBox(height: 12.h),
+                        SizedBox(height: 4.h),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text('ZetraID', style: tt.bodyMedium),
-                            Text(
-                              recipientData.value?['zetra_id'] as String? ?? recipientController.text,
-                              style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
-                            ),
+                            Text('Zetra ID', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                            Text(selectedRecipient.value?.zetraId ?? '', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
                           ],
                         ),
                         SizedBox(height: 12.h),
@@ -478,7 +530,7 @@ class AppSendMoneyScreen extends HookConsumerWidget {
                           children: [
                             Text('Amount', style: tt.bodyMedium),
                             Text(
-                              '${(int.parse(amountController.text) / 1000).toStringAsFixed(2)} CP',
+                              '${amountController.text} ${sendUnit.value == SendUnit.cent ? 'Cent' : 'CP'}',
                               style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
                             ),
                           ],
@@ -488,15 +540,16 @@ class AppSendMoneyScreen extends HookConsumerWidget {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text('App', style: tt.bodyMedium),
-                            Text(
-                              appNames[appId] ?? appId,
-                              style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
-                            ),
+                            Text(appNames[appId] ?? appId, style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.bold)),
                           ],
                         ),
                       ],
                     ),
                   ),
+                  if (error.value != null) ...[
+                    SizedBox(height: 12.h),
+                    Text(error.value!, style: TextStyle(color: cs.error)),
+                  ],
                   SizedBox(height: 32.h),
                   Row(
                     children: [
@@ -511,11 +564,7 @@ class AppSendMoneyScreen extends HookConsumerWidget {
                         child: ElevatedButton(
                           onPressed: isLoading.value ? null : handleSend,
                           child: isLoading.value
-                              ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
-                                )
+                              ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
                               : const Text('Send'),
                         ),
                       ),
