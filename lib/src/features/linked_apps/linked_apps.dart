@@ -1,17 +1,19 @@
 // lib/src/features/linked_apps/linked_apps.dart
 //
-// FIXED VERSION — "Send to Apps" now correctly:
-// 1. Resolves the recipient's ZetraID to their real user_id via the
-//    `profiles` table (previously this step was missing entirely, which
-//    caused the wallet lookup to always search for a nonexistent user
-//    and made the button spin forever).
-// 2. Reads/writes balances through `app_currency_balances` (the real,
-//    shared table used across all apps), instead of a per-app
-//    `naijalearn_wallets` / `nigergram_wallets` table that never existed.
-// 3. Debits the sender and credits the recipient through the existing
-//    `spend_app_currency` and `credit_app_currency` RPCs, which run
-//    server-side with proper checks, instead of the client directly
-//    overwriting balance numbers (which is unsafe and can race).
+// "Send to Apps" feature — self-contained. Fixed two bugs from the
+// original version:
+// 1. Recipient lookup now correctly resolves ZetraID -> profiles.id ->
+//    app_currency_balances, instead of searching a nonexistent
+//    "naijalearn_wallets" table using the raw ZetraID text as a user_id
+//    (which is what caused the infinite spinner).
+// 2. Sending money is now a single atomic RPC (transfer_app_currency)
+//    instead of two separate client-side balance updates, so a dropped
+//    connection mid-transfer can never leave money debited from the
+//    sender without reaching the recipient.
+//
+// This file does not call, modify, or depend on transfer_cp,
+// buy_app_currency, spend_app_currency, or credit_app_currency in any
+// way — those remain fully separate and untouched.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -22,8 +24,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 // ==================== PROVIDERS ====================
 
-/// Resolves a recipient's ZetraID to their profile + their balance for
-/// [appId], in one shot. Returns null if no profile matches that ZetraID.
 final appRecipientProvider =
     FutureProvider.family<Map<String, dynamic>?, (String, String)>(
   (ref, params) async {
@@ -33,7 +33,6 @@ final appRecipientProvider =
   },
 );
 
-/// The signed-in user's own balance for [appId].
 final myAppBalanceProvider = FutureProvider.family<double, String>(
   (ref, appId) async {
     final repo = AppWalletsRepository(appId);
@@ -43,7 +42,7 @@ final myAppBalanceProvider = FutureProvider.family<double, String>(
   },
 );
 
-// ==================== REPOSITORIES ====================
+// ==================== REPOSITORY ====================
 
 class AppWalletsRepository {
   final String appId;
@@ -52,9 +51,9 @@ class AppWalletsRepository {
 
   SupabaseClient get _client => Supabase.instance.client;
 
-  /// Step 1 of sending money: look up who owns a given ZetraID, via the
-  /// shared `profiles` table (NOT a per-app wallets table — ZetraID is a
-  /// Zetra-ecosystem-wide identifier, not something each app tracks).
+  /// Step 1 of sending money: resolve a ZetraID to the account that owns
+  /// it, via the shared `profiles` table (ZetraID is a Zetra-ecosystem
+  /// identifier, not something each app tracks separately).
   Future<Map<String, dynamic>?> resolveRecipientByZetraId(String zetraId) async {
     try {
       final profile = await _client
@@ -79,9 +78,8 @@ class AppWalletsRepository {
     }
   }
 
-  /// Reads a user's balance for this app from the shared
-  /// `app_currency_balances` table. Returns 0 if they have no row yet
-  /// (i.e. they've never received or spent this app's currency before).
+  /// Reads a user's balance for this app from `app_currency_balances`.
+  /// Returns 0 if they have no row yet.
   Future<double> getBalance(String userId) async {
     try {
       final row = await _client
@@ -97,37 +95,24 @@ class AppWalletsRepository {
     }
   }
 
-  /// Debits [unitAmount] from the signed-in user's own balance for this
-  /// app, via the server-side RPC (which checks sufficient balance and
-  /// prevents race conditions — never do this with a raw client update).
-  Future<void> spendFromMyBalance(double unitAmount) async {
-    final result = await _client.rpc('spend_app_currency', params: {
-      'p_app_id': appId,
-      'p_unit_amount': unitAmount,
-    });
-    if (!(result is Map && result['success'] == true)) {
-      throw Exception('Could not debit your balance');
-    }
-  }
-
-  /// Credits [unitAmount] to [recipientUserId]'s balance for this app,
-  /// via a server-side RPC. This assumes `credit_app_currency` (or an
-  /// equivalent) accepts a target user_id — if your current RPC only
-  /// credits `auth.uid()` (the caller), it needs a small server-side
-  /// addition to accept crediting a *different* user for peer transfers.
-  /// That addition is a backend task, not something the client can work
-  /// around safely.
-  Future<void> creditRecipientBalance({
+  /// Atomically debits the signed-in user and credits [recipientUserId]
+  /// in one server-side transaction via `transfer_app_currency` — the
+  /// only write path this feature uses. Either both sides complete or
+  /// neither does; there is no window where money leaves one balance
+  /// without reaching the other.
+  Future<void> transferToUser({
     required String recipientUserId,
     required double unitAmount,
+    String? note,
   }) async {
-    final result = await _client.rpc('credit_app_currency_to_user', params: {
+    final result = await _client.rpc('transfer_app_currency', params: {
       'p_app_id': appId,
       'p_recipient_user_id': recipientUserId,
       'p_unit_amount': unitAmount,
+      'p_note': note,
     });
     if (!(result is Map && result['success'] == true)) {
-      throw Exception('Could not credit the recipient');
+      throw Exception('Transfer failed');
     }
   }
 }
@@ -267,7 +252,6 @@ class AppSendMoneyScreen extends HookConsumerWidget {
       isLoading.value = true;
 
       try {
-        // Correct two-step lookup: ZetraID -> profile -> balance.
         final result = await repo.resolveRecipientByZetraId(zetraId);
 
         if (result != null) {
@@ -314,34 +298,19 @@ class AppSendMoneyScreen extends HookConsumerWidget {
         final currentUser = Supabase.instance.client.auth.currentUser;
         if (currentUser == null) throw Exception('Not authenticated');
 
-        // Prevent sending to yourself, which the old code never checked.
         if (recipient['user_id'] == currentUser.id) {
           throw Exception('You cannot send to your own account');
         }
 
-        final unitAmount = amount / 1000.0; // cents -> app currency units, matches existing convention
+        final unitAmount = amount / 1000.0;
 
-        // Debit sender via RPC (server-side balance check, no race conditions).
-        await repo.spendFromMyBalance(unitAmount);
-
-        // Credit recipient via RPC.
-        await repo.creditRecipientBalance(
+        // Single atomic call — replaces the old two-step manual balance
+        // update entirely.
+        await repo.transferToUser(
           recipientUserId: recipient['user_id'] as String,
           unitAmount: unitAmount,
+          note: noteController.text.isEmpty ? null : noteController.text,
         );
-
-        // Log it for the sender's own transaction history.
-        await Supabase.instance.client.from('transactions').insert({
-          'user_id': currentUser.id,
-          'amount': amount,
-          'type': 'transfer',
-          'description': noteController.text.isEmpty
-              ? 'Transfer to ${appNames[appId]}'
-              : noteController.text,
-          'recipient_id': recipient['user_id'],
-          'app_type': appId,
-          'status': 'completed',
-        });
 
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
