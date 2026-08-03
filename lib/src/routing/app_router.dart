@@ -91,14 +91,13 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const ReceiveMoneyScreen(),
       ),
       GoRoute(
-        path: AppRoutes.linkedApps,
+        path: '/linked-apps',
         builder: (context, state) => const LinkedAppsScreen(),
       ),
       GoRoute(
-        // FIXED: was '/app-send/:appId' (old path, no longer used by
-        // linked_apps.dart), now matches the renamed top-up flow that
-        // LinkedAppsScreen actually navigates to.
-        path: AppRoutes.appTopUp,
+        // Matches what linked_apps.dart actually navigates to:
+        // context.push('/app-topup/${app['id']}')
+        path: '/app-topup/:appId',
         builder: (context, state) {
           final appId = state.pathParameters['appId']!;
           return AppSendMoneyScreen(appId: appId);
