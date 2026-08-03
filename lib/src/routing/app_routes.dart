@@ -34,4 +34,15 @@ abstract final class AppRoutes {
   static const String cards = '/cards';
 
   static const String account = '/account';
+
+  // Linked apps (Send to Apps / Fund App Balance)
+
+  static const String linkedApps = '/apps';
+
+  /// Route PATTERN — used only when registering the GoRoute itself.
+  static const String appTopUp = '/app-topup/:appId';
+
+  /// Route BUILDER — used when navigating, e.g.
+  /// context.push(AppRoutes.appTopUpPath('naijalearn'))
+  static String appTopUpPath(String appId) => '/app-topup/$appId';
 }
