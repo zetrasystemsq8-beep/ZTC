@@ -95,9 +95,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const LinkedAppsScreen(),
       ),
       GoRoute(
-        // Matches what linked_apps.dart actually navigates to:
-        // context.push('/app-topup/${app['id']}')
-        path: '/app-topup/:appId',
+        path: '/app-send/:appId',
         builder: (context, state) {
           final appId = state.pathParameters['appId']!;
           return AppSendMoneyScreen(appId: appId);
