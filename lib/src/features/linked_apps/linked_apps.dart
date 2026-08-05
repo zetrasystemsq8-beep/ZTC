@@ -1,13 +1,11 @@
 // lib/src/features/linked_apps/linked_apps.dart
 //
-// "Send to Apps" — send CP (converted into that app's own currency via
-// send_cp_to_app_currency) or an app's own currency directly (e.g.
-// NaijaLearn Cent, via transfer_app_currency) to another Zetra user,
-// scoped to a chosen app.
+// "Send to Apps" — send CP and/or Cent to another Zetra user,
+// scoped to a chosen app. Both currencies can be sent in a single transaction.
 //
 // Self-send rule:
 // - Sending Cent to yourself is valid — it's how a user funds their
-//   own balance inside that app (topping up NigerGram Cent, say).
+//   own balance inside that app (topping up NaijaLearn Cent, say).
 // - Sending CP to yourself is ALSO valid now, and for the same reason:
 //   since sendCp calls send_cp_to_app_currency (not a raw wallet-to-
 //   wallet transfer), sending CP "to yourself" is exactly how someone
@@ -29,8 +27,6 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 // ==================== SHARED MODELS ====================
-
-enum SendUnit { cp, cent }
 
 class RecipientMatch {
   final String userId;
@@ -253,11 +249,11 @@ class AppSendMoneyScreen extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final searchController = useTextEditingController();
-    final amountController = useTextEditingController();
+    final cpController = useTextEditingController();
+    final centController = useTextEditingController();
     final noteController = useTextEditingController();
     final isLoading = useState(false);
     final currentStep = useState(0);
-    final sendUnit = useState(SendUnit.cent);
 
     final selectedRecipient = useState<RecipientMatch?>(null);
     final searchResults = useState<List<RecipientMatch>>([]);
@@ -309,9 +305,11 @@ class AppSendMoneyScreen extends HookConsumerWidget {
         return;
       }
 
-      final amount = double.tryParse(amountController.text);
-      if (amount == null || amount <= 0) {
-        error.value = 'Enter a valid amount';
+      final cpAmount = double.tryParse(cpController.text) ?? 0;
+      final centAmount = double.tryParse(centController.text) ?? 0;
+
+      if (cpAmount <= 0 && centAmount <= 0) {
+        error.value = 'Enter at least one amount (CP or Cent)';
         return;
       }
 
@@ -319,27 +317,37 @@ class AppSendMoneyScreen extends HookConsumerWidget {
       error.value = null;
 
       try {
-        if (sendUnit.value == SendUnit.cent) {
-          await repo.sendAppCurrency(
-            recipientUserId: recipient.userId,
-            unitAmount: amount,
-            note: noteController.text.isEmpty ? null : noteController.text,
-          );
-        } else {
+        // Send CP first (if amount > 0)
+        if (cpAmount > 0) {
           final sendError = await repo.sendCp(
             recipientUserId: recipient.userId,
-            cpAmount: amount,
-            note: noteController.text,
+            cpAmount: cpAmount,
+            note: noteController.text.isEmpty ? null : noteController.text,
           );
           if (sendError != null) {
             throw Exception(sendError);
           }
         }
 
+        // Then send Cent (if amount > 0)
+        if (centAmount > 0) {
+          await repo.sendAppCurrency(
+            recipientUserId: recipient.userId,
+            unitAmount: centAmount,
+            note: noteController.text.isEmpty ? null : noteController.text,
+          );
+        }
+
         if (context.mounted) {
-          final unitLabel = sendUnit.value == SendUnit.cent ? 'Cent' : 'CP';
+          String amountSummary = '';
+          if (cpAmount > 0) amountSummary += '$cpAmount CP';
+          if (centAmount > 0) {
+            if (amountSummary.isNotEmpty) amountSummary += ' and ';
+            amountSummary += '$centAmount Cent';
+          }
+
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Sent $amount $unitLabel to ${appNames[appId]}')),
+            SnackBar(content: Text('Sent $amountSummary to ${appNames[appId]}')),
           );
           Future.delayed(const Duration(seconds: 1), () {
             if (context.mounted) Navigator.pop(context);
@@ -445,33 +453,41 @@ class AppSendMoneyScreen extends HookConsumerWidget {
                       ),
                     ),
                   ],
-                  SizedBox(height: 20.h),
-                  Text('Send as', style: tt.labelLarge?.copyWith(color: cs.onSurfaceVariant)),
+                  SizedBox(height: 24.h),
+                  Text('Amount', style: tt.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
+                  SizedBox(height: 16.h),
+                  Text('Send CP', style: tt.labelLarge?.copyWith(color: cs.onSurfaceVariant)),
                   SizedBox(height: 8.h),
-                  SegmentedButton<SendUnit>(
-                    segments: const [
-                      ButtonSegment(value: SendUnit.cent, label: Text('Cent'), icon: Icon(Icons.savings_outlined)),
-                      ButtonSegment(value: SendUnit.cp, label: Text('CP'), icon: Icon(Icons.account_balance_wallet_outlined)),
-                    ],
-                    selected: {sendUnit.value},
-                    onSelectionChanged: (s) => sendUnit.value = s.first,
+                  TextField(
+                    controller: cpController,
+                    decoration: InputDecoration(
+                      labelText: 'Amount (CP)',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r)),
+                      prefixIcon: const Icon(Icons.account_balance_wallet_outlined),
+                    ),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   ),
                   SizedBox(height: 4.h),
                   Text(
-                    sendUnit.value == SendUnit.cent
-                        ? "Sends directly into the recipient's ${appNames[appId]} balance. You can send this to yourself to fund your own balance."
-                        : "Converts your CP into the recipient's ${appNames[appId]} balance. You can send this to yourself to fund your own balance from CP.",
+                    "Converts your CP into ${appNames[appId]}'s currency. You can send to yourself to fund your own balance from CP.",
                     style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                   ),
                   SizedBox(height: 16.h),
+                  Text('Send Cent', style: tt.labelLarge?.copyWith(color: cs.onSurfaceVariant)),
+                  SizedBox(height: 8.h),
                   TextField(
-                    controller: amountController,
+                    controller: centController,
                     decoration: InputDecoration(
-                      labelText: sendUnit.value == SendUnit.cent ? 'Amount (Cent)' : 'Amount (CP)',
+                      labelText: 'Amount (Cent)',
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r)),
-                      prefixIcon: const Icon(Icons.money),
+                      prefixIcon: const Icon(Icons.savings_outlined),
                     ),
-                    keyboardType: TextInputType.number,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  ),
+                  SizedBox(height: 4.h),
+                  Text(
+                    "Sends directly into the recipient's ${appNames[appId]} balance. You can send to yourself to fund your own balance.",
+                    style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                   ),
                   SizedBox(height: 16.h),
                   TextField(
@@ -497,9 +513,10 @@ class AppSendMoneyScreen extends HookConsumerWidget {
                           error.value = 'Select a recipient from the search results';
                           return;
                         }
-                        final amount = double.tryParse(amountController.text);
-                        if (amount == null || amount <= 0) {
-                          error.value = 'Enter a valid amount';
+                        final cpAmount = double.tryParse(cpController.text) ?? 0;
+                        final centAmount = double.tryParse(centController.text) ?? 0;
+                        if (cpAmount <= 0 && centAmount <= 0) {
+                          error.value = 'Enter at least one amount (CP or Cent)';
                           return;
                         }
                         error.value = null;
@@ -541,17 +558,32 @@ class AppSendMoneyScreen extends HookConsumerWidget {
                           ],
                         ),
                         SizedBox(height: 12.h),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text('Amount', style: tt.bodyMedium),
-                            Text(
-                              '${amountController.text} ${sendUnit.value == SendUnit.cent ? 'Cent' : 'CP'}',
-                              style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 12.h),
+                        if ((double.tryParse(cpController.text) ?? 0) > 0) ...[
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('CP Amount', style: tt.bodyMedium),
+                              Text(
+                                '${cpController.text} CP',
+                                style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 12.h),
+                        ],
+                        if ((double.tryParse(centController.text) ?? 0) > 0) ...[
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('Cent Amount', style: tt.bodyMedium),
+                              Text(
+                                '${centController.text} Cent',
+                                style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 12.h),
+                        ],
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
