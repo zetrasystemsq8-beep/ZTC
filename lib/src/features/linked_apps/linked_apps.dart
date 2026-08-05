@@ -1,17 +1,18 @@
 // lib/src/features/linked_apps/linked_apps.dart
 //
-// "Send to Apps" — send either CP (real wallet-to-wallet, via
-// transfer_cp) or an app's own currency (e.g. NaijaLearn Cent, via
-// transfer_app_currency) to another Zetra user, scoped to a chosen app.
+// "Send to Apps" — send CP (converted into that app's own currency via
+// send_cp_to_app_currency) or an app's own currency directly (e.g.
+// NaijaLearn Cent, via transfer_app_currency) to another Zetra user,
+// scoped to a chosen app.
 //
 // Self-send rule:
-// - Sending CP to yourself is blocked — CP is real wallet-to-wallet
-//   money movement between two people, and sending it to yourself
-//   makes no sense.
-// - Sending an app's own currency (Cent) to yourself IS allowed — this
-//   is exactly how a user funds their own balance inside that app
-//   (e.g. topping up their NaijaLearn Cent from their ZTC CP). This was
-//   previously blocked by mistake, which is what this fix corrects.
+// - Sending Cent to yourself is valid — it's how a user funds their
+//   own balance inside that app (topping up NigerGram Cent, say).
+// - Sending CP to yourself is ALSO valid now, and for the same reason:
+//   since sendCp calls send_cp_to_app_currency (not a raw wallet-to-
+//   wallet transfer), sending CP "to yourself" is exactly how someone
+//   converts their own CP into their own app-currency balance for the
+//   first time. Blocking it would make that conversion impossible.
 //
 // Recipient lookup uses search_profiles (SECURITY DEFINER RPC) instead
 // of querying `profiles` directly — a direct query is blocked by RLS
@@ -93,7 +94,8 @@ class AppWalletsRepository {
     return (row?['balance'] as num?)?.toDouble() ?? 0.0;
   }
 
-  /// The signed-in user's own wallet id, needed for a CP transfer.
+  /// The signed-in user's own wallet id. Kept for anything else in the
+  /// app that still needs it — no longer used by sendCp itself.
   Future<String> getMyWalletId() async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) throw Exception('Not signed in');
@@ -128,22 +130,31 @@ class AppWalletsRepository {
     }
   }
 
-  /// Sends real CP from the signed-in user's own wallet, via the same
-  /// secured transfer_cp RPC ZTC's Send Money screen uses. Self-send is
-  /// blocked server-side inside transfer_cp itself, unchanged.
+  /// Sends CP, converted into THIS app's own currency for the
+  /// recipient — via send_cp_to_app_currency, which debits the
+  /// sender's real CP wallet and credits the recipient's
+  /// app_currency_balances row for [appId], using that app's own
+  /// registered conversion rate (cents_per_unit).
+  ///
+  /// Sending to yourself is valid and intentional — that's how a user
+  /// converts their own CP into their own app-currency balance for
+  /// the first time.
+  ///
+  /// This replaced a call to transfer_cp, which only moved CP between
+  /// regular wallets and never touched app_currency_balances at all —
+  /// meaning a "CP" send through an app card never actually reached
+  /// the app it was sent through.
   Future<String?> sendCp({
-    required String recipientZetraId,
+    required String recipientUserId,
     required double cpAmount,
     String? note,
   }) async {
     try {
-      final walletId = await getMyWalletId();
-
-      final result = await _client.rpc('transfer_cp', params: {
-        'p_sender_wallet_id': walletId,
-        'p_recipient_zetra_id': recipientZetraId,
-        'p_amount': cpAmount,
-        'p_description': note?.isEmpty ?? true ? 'Transfer via $appId' : note,
+      final result = await _client.rpc('send_cp_to_app_currency', params: {
+        'p_app_id': appId,
+        'p_recipient_user_id': recipientUserId,
+        'p_cp_amount': cpAmount,
+        'p_note': (note?.isEmpty ?? true) ? null : note,
       }).timeout(_timeout);
 
       if (result is Map && result['success'] == true) return null;
@@ -304,18 +315,6 @@ class AppSendMoneyScreen extends HookConsumerWidget {
         return;
       }
 
-      final currentUser = Supabase.instance.client.auth.currentUser;
-      final isSelf = currentUser != null && recipient.userId == currentUser.id;
-
-      // Self-send is only blocked for real CP transfers (peer-to-peer
-      // wallet movement between two different people). Sending Cent to
-      // yourself is valid and expected — that's how a user funds their
-      // own balance inside this app from their ZTC wallet.
-      if (isSelf && sendUnit.value == SendUnit.cp) {
-        error.value = 'You cannot send CP to your own account';
-        return;
-      }
-
       isLoading.value = true;
       error.value = null;
 
@@ -328,7 +327,7 @@ class AppSendMoneyScreen extends HookConsumerWidget {
           );
         } else {
           final sendError = await repo.sendCp(
-            recipientZetraId: recipient.zetraId,
+            recipientUserId: recipient.userId,
             cpAmount: amount,
             note: noteController.text,
           );
@@ -461,7 +460,7 @@ class AppSendMoneyScreen extends HookConsumerWidget {
                   Text(
                     sendUnit.value == SendUnit.cent
                         ? "Sends directly into the recipient's ${appNames[appId]} balance. You can send this to yourself to fund your own balance."
-                        : 'Sends real CP from your Zetra wallet to their wallet.',
+                        : "Converts your CP into the recipient's ${appNames[appId]} balance. You can send this to yourself to fund your own balance from CP.",
                     style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                   ),
                   SizedBox(height: 16.h),
