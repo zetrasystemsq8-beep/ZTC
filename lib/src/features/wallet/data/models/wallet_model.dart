@@ -5,6 +5,7 @@ class WalletModel extends Wallet {
     required super.id,
     required super.userId,
     required super.balance,
+    required super.balanceCents,
     required super.currency,
     required super.createdAt,
     required super.updatedAt,
@@ -15,6 +16,7 @@ class WalletModel extends Wallet {
       id: json['id'] as String? ?? '',
       userId: json['user_id'] as String? ?? '',
       balance: (json['balance'] as num?)?.toDouble() ?? 0.0,
+      balanceCents: (json['balance_cents'] as num?)?.toInt() ?? 0,
       currency: json['currency'] as String? ?? 'USD',
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'] as String)
@@ -30,6 +32,7 @@ class WalletModel extends Wallet {
       'id': id,
       'user_id': userId,
       'balance': balance,
+      'balance_cents': balanceCents,
       'currency': currency,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
