@@ -55,6 +55,11 @@ class _DashboardBalanceCardState extends State<DashboardBalanceCard> {
     return '$wholeStr.$fraction';
   }
 
+  String _formatCents() {
+    final cents = widget.wallet.balanceCents;
+    return cents.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+$)'), (m) => '${m[1]},');
+  }
+
   Future<void> _copyAccount(BuildContext context, String accountNumber) async {
     await CopyService.instance.copy(accountNumber);
     if (!context.mounted) return;
@@ -156,6 +161,16 @@ class _DashboardBalanceCardState extends State<DashboardBalanceCard> {
                     ),
                   ],
                 ),
+                if (!widget.isHidden && widget.wallet.balanceCents > 0) ...[
+                  SizedBox(height: 4.h),
+                  Text(
+                    '+ ${_formatCents()} Cent',
+                    style: tt.bodyMedium?.copyWith(
+                      color: onCard.withValues(alpha: 0.75),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
                 SizedBox(height: AppSpacing.lg.h),
                 FutureBuilder<String?>(
                   future: _zetraIdFuture,
