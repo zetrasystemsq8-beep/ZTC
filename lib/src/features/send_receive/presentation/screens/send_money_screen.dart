@@ -1,13 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:ztc_bank/src/features/wallet/presentation/providers/wallet_provider.dart';
-import 'package:ztc_bank/src/utils/cp_format.dart';
 
 void _showAppSnackBar(
   BuildContext context, {
@@ -108,11 +108,11 @@ class SendMoneyScreen extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final searchController = useTextEditingController();
-    final amountController = useTextEditingController();
+    final cpController = useTextEditingController();
+    final centController = useTextEditingController();
     final noteController = useTextEditingController();
     final isLoading = useState(false);
     final currentStep = useState(0); // 0 = enter details, 1 = confirm
-    final inputUnit = useState(CpInputUnit.cp);
 
     final selectedRecipient = useState<_RecipientMatch?>(null);
     final searchResults = useState<List<_RecipientMatch>>([]);
@@ -152,10 +152,30 @@ class SendMoneyScreen extends HookConsumerWidget {
       searchResults.value = [];
     }
 
-    double? resolveCpAmount() {
-      final raw = double.tryParse(amountController.text);
-      if (raw == null) return null;
-      return inputUnit.value == CpInputUnit.cp ? raw : CpFormat.centsToCp(raw.round());
+    /// Carries any Cent overflow (1000+) into the CP field live, so
+    /// typing "1500" in Cent instantly becomes "1" CP + "500" Cent.
+    /// CP and Cent are ONE currency at two denominations — this keeps
+    /// the split always valid, never letting Cent alone imply a larger
+    /// value than what actually shows on screen.
+    void onCentChanged(String value) {
+      final raw = int.tryParse(value) ?? 0;
+      if (raw >= 1000) {
+        final overflowCp = raw ~/ 1000;
+        final remainder = raw % 1000;
+        final currentCp = int.tryParse(cpController.text) ?? 0;
+        cpController.text = (currentCp + overflowCp).toString();
+        centController.text = remainder.toString();
+        centController.selection = TextSelection.collapsed(offset: centController.text.length);
+      }
+    }
+
+    /// Combines the CP field and Cent field into one total CP value
+    /// (e.g. 2 CP + 500 Cent = 2.5 CP) — the only shape the backend
+    /// transfer_cp RPC accepts.
+    double totalCpAmount() {
+      final cp = int.tryParse(cpController.text) ?? 0;
+      final cent = int.tryParse(centController.text) ?? 0;
+      return cp + (cent / 1000.0);
     }
 
     Future<void> handleSend() async {
@@ -165,8 +185,8 @@ class SendMoneyScreen extends HookConsumerWidget {
         return;
       }
 
-      final cpAmount = resolveCpAmount();
-      if (cpAmount == null || cpAmount <= 0) {
+      final cpAmount = totalCpAmount();
+      if (cpAmount <= 0) {
         _showAppSnackBar(context, message: 'Enter a valid amount', type: _SnackType.error);
         return;
       }
@@ -306,53 +326,63 @@ class SendMoneyScreen extends HookConsumerWidget {
                       ),
                     ),
                   ],
-                  SizedBox(height: 16.h),
+                  SizedBox(height: 24.h),
                   Text(
                     'Amount',
-                    style: tt.labelLarge?.copyWith(color: cs.onSurfaceVariant),
+                    style: tt.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
                   ),
-                  SizedBox(height: 8.h),
+                  SizedBox(height: 16.h),
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
-                        child: TextField(
-                          controller: amountController,
-                          decoration: InputDecoration(
-                            hintText: inputUnit.value == CpInputUnit.cp ? '0.00' : '0',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12.r),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('CP', style: tt.labelLarge?.copyWith(color: cs.onSurfaceVariant)),
+                            SizedBox(height: 8.h),
+                            TextField(
+                              controller: cpController,
+                              keyboardType: TextInputType.number,
+                              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                              decoration: InputDecoration(
+                                hintText: '0',
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r)),
+                              ),
                             ),
-                            prefixIcon: const Icon(Icons.monetization_on_outlined),
-                          ),
-                          keyboardType: TextInputType.number,
-                          onChanged: (_) {
-                            (context as Element).markNeedsBuild();
-                          },
+                          ],
                         ),
                       ),
-                      SizedBox(width: 8.w),
-                      SegmentedButton<CpInputUnit>(
-                        segments: const [
-                          ButtonSegment(value: CpInputUnit.cp, label: Text('CP')),
-                          ButtonSegment(value: CpInputUnit.cent, label: Text('Cent')),
-                        ],
-                        selected: {inputUnit.value},
-                        onSelectionChanged: (selection) {
-                          inputUnit.value = selection.first;
-                        },
+                      SizedBox(width: 12.w),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Cent', style: tt.labelLarge?.copyWith(color: cs.onSurfaceVariant)),
+                            SizedBox(height: 8.h),
+                            TextField(
+                              controller: centController,
+                              keyboardType: TextInputType.number,
+                              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                              onChanged: onCentChanged,
+                              decoration: InputDecoration(
+                                hintText: '0',
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r)),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
-                  SizedBox(height: 6.h),
+                  SizedBox(height: 8.h),
                   Builder(builder: (context) {
-                    final cpAmount = resolveCpAmount();
-                    if (cpAmount == null || cpAmount <= 0) return const SizedBox.shrink();
+                    final cp = int.tryParse(cpController.text) ?? 0;
+                    final cent = int.tryParse(centController.text) ?? 0;
+                    if (cp == 0 && cent == 0) return const SizedBox.shrink();
                     return Text(
-                      inputUnit.value == CpInputUnit.cp
-                          ? '≈ ${CpFormat.displayCents(cpAmount)}'
-                          : '≈ ${CpFormat.displayCp(cpAmount)}',
-                      style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                      'Total: $cp CP $cent Cent',
+                      style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant, fontWeight: FontWeight.w600),
                     );
                   }),
                   SizedBox(height: 16.h),
@@ -377,8 +407,7 @@ class SendMoneyScreen extends HookConsumerWidget {
                           _showAppSnackBar(context, message: 'Select a recipient from the search results', type: _SnackType.error);
                           return;
                         }
-                        final cpAmount = resolveCpAmount();
-                        if (cpAmount == null || cpAmount <= 0) {
+                        if (totalCpAmount() <= 0) {
                           _showAppSnackBar(context, message: 'Enter a valid amount', type: _SnackType.error);
                           return;
                         }
@@ -434,9 +463,10 @@ class SendMoneyScreen extends HookConsumerWidget {
                           children: [
                             Text('Amount', style: tt.bodyMedium),
                             Builder(builder: (context) {
-                              final cpAmount = resolveCpAmount() ?? 0;
+                              final cp = int.tryParse(cpController.text) ?? 0;
+                              final cent = int.tryParse(centController.text) ?? 0;
                               return Text(
-                                CpFormat.displayBoth(cpAmount),
+                                '$cp CP $cent Cent',
                                 style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
                               );
                             }),
