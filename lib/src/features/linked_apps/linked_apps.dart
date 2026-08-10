@@ -491,39 +491,43 @@ class AppSendMoneyScreen extends HookConsumerWidget {
                   ),
                   SizedBox(height: 16.h),
                   TextField(
-                    controller: noteController,
+                    controller: cpController,
                     decoration: InputDecoration(
-                      labelText: 'Note (Optional)',
+                      labelText: 'Amount (CP)',
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r)),
-                      prefixIcon: const Icon(Icons.note),
+                      prefixIcon: const Icon(Icons.account_balance_wallet_outlined),
                     ),
-                    maxLines: 3,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   ),
-                  if (error.value != null) ...[
-                    SizedBox(height: 12.h),
-                    Text(error.value!, style: TextStyle(color: cs.error)),
-                  ],
-                  SizedBox(height: 32.h),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 56.h,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        if (selectedRecipient.value == null) {
-                          error.value = 'Select a recipient from the search results';
-                          return;
-                        }
-                        final cpAmount = double.tryParse(cpController.text) ?? 0;
-                        final centAmount = double.tryParse(centController.text) ?? 0;
-                        if (cpAmount <= 0 && centAmount <= 0) {
-                          error.value = 'Enter at least one amount (CP or Cent)';
-                          return;
-                        }
-                        error.value = null;
-                        currentStep.value = 1;
-                      },
-                      child: const Text('Review Transfer'),
+                  SizedBox(height: 4.h),
+                  Text(
+                    "Converts your CP into ${appNames[appId]}'s currency. You can send to yourself to fund your own balance from CP.",
+                    style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                  ),
+                  SizedBox(height: 16.h),
+                  Text('Send Cent', style: tt.labelLarge?.copyWith(color: cs.onSurfaceVariant)),
+                  SizedBox(height: 8.h),
+                  TextField(
+                    controller: centController,
+                    decoration: InputDecoration(
+                      labelText: 'Amount (Cent)',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r)),
+                      prefixIcon: const Icon(Icons.savings_outlined),
                     ),
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    onChanged: (value) {
+                      final raw = int.tryParse(value) ?? 0;
+                      if (raw >= 1000) {
+                        final overflowCp = raw ~/ 1000;
+                        final remainder = raw % 1000;
+                        final currentCp = int.tryParse(cpController.text) ?? 0;
+                        cpController.text = (currentCp + overflowCp).toString();
+                        centController.text = remainder.toString();
+                        centController.selection = TextSelection.collapsed(offset: centController.text.length);
+                      }
+                    },
                   ),
                 ],
               )
