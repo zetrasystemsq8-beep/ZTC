@@ -13,6 +13,19 @@ class TransactionItem extends StatelessWidget {
     this.onTap,
   });
 
+  /// Splits a CP amount (which may include a fractional Cent portion,
+  /// e.g. 0.002 = 2 Cent) into a "X CP" / "X CP Y Cent" / "Y Cent"
+  /// display string. Never rounds a small amount away to "0.00".
+  String _formatAmount(double cpAmount) {
+    final totalCents = (cpAmount * 1000).round();
+    final cp = totalCents ~/ 1000;
+    final cent = totalCents % 1000;
+
+    if (cp > 0 && cent > 0) return '$cp CP $cent Cent';
+    if (cp > 0) return '$cp CP';
+    return '$cent Cent';
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -64,7 +77,7 @@ class TransactionItem extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  '${isCredit ? '+' : '-'} ${transaction.amount.toStringAsFixed(2)} CP',
+                  '${isCredit ? '+' : '-'} ${_formatAmount(transaction.amount)}',
                   style: tt.bodyMedium?.copyWith(
                     color: color,
                     fontWeight: FontWeight.w600,
