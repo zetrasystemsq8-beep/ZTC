@@ -490,7 +490,11 @@ class AppSendMoneyScreen extends HookConsumerWidget {
                     "Sends directly into the recipient's ${appNames[appId]} balance. You can send to yourself to fund your own balance.",
                     style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                   ),
+                  SizedBox(height: 24.h),
+                  Text('Amount', style: tt.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
                   SizedBox(height: 16.h),
+                  Text('Send CP', style: tt.labelLarge?.copyWith(color: cs.onSurfaceVariant)),
+                  SizedBox(height: 8.h),
                   TextField(
                     controller: cpController,
                     decoration: InputDecoration(
@@ -529,6 +533,33 @@ class AppSendMoneyScreen extends HookConsumerWidget {
                         centController.selection = TextSelection.collapsed(offset: centController.text.length);
                       }
                     },
+                  ),
+                  SizedBox(height: 4.h),
+                  Text(
+                    "Sends directly into the recipient's ${appNames[appId]} balance. You can send to yourself to fund your own balance.",
+                    style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                  ),
+                  SizedBox(height: 32.h),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 56.h,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        if (selectedRecipient.value == null) {
+                          error.value = 'Select a recipient from the search results';
+                          return;
+                        }
+                        final cpAmount = double.tryParse(cpController.text) ?? 0;
+                        final centAmount = double.tryParse(centController.text) ?? 0;
+                        if (cpAmount <= 0 && centAmount <= 0) {
+                          error.value = 'Enter at least one amount (CP or Cent)';
+                          return;
+                        }
+                        error.value = null;
+                        currentStep.value = 1;
+                      },
+                      child: const Text('Review Transfer'),
+                    ),
                   ),
                 ],
               )
