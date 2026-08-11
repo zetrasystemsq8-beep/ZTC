@@ -1,16 +1,15 @@
 // lib/src/features/linked_apps/linked_apps.dart
 //
 // "Send to Apps" — send CP and/or Cent to another Zetra user,
-// scoped to a chosen app. Both currencies can be sent in a single transaction.
+// scoped to a chosen app. CP and Cent are ONE currency at two
+// denominations (1 CP = 1000 Cent) — there is only ever one debit
+// from the sender's real wallet, via send_wallet_amount_to_app, which
+// combines whatever CP + Cent was entered into a single total before
+// touching the database. No more separate CP-pool/Cent-pool split.
 //
 // Self-send rule:
-// - Sending Cent to yourself is valid — it's how a user funds their
-//   own balance inside that app (topping up NaijaLearn Cent, say).
-// - Sending CP to yourself is ALSO valid now, and for the same reason:
-//   since sendCp calls send_cp_to_app_currency (not a raw wallet-to-
-//   wallet transfer), sending CP "to yourself" is exactly how someone
-//   converts their own CP into their own app-currency balance for the
-//   first time. Blocking it would make that conversion impossible.
+// - Sending to yourself is valid — it's how a user funds their own
+//   balance inside that app (topping up NaijaLearn/NigerGram Cent).
 //
 // Recipient lookup uses search_profiles (SECURITY DEFINER RPC) instead
 // of querying `profiles` directly — a direct query is blocked by RLS
@@ -92,7 +91,7 @@ class AppWalletsRepository {
   }
 
   /// The signed-in user's own wallet id. Kept for anything else in the
-  /// app that still needs it — no longer used by sendCp itself.
+  /// app that still needs it.
   Future<String> getMyWalletId() async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) throw Exception('Not signed in');
@@ -107,54 +106,25 @@ class AppWalletsRepository {
     return row['id'] as String;
   }
 
-  /// Sends this app's own currency (e.g. NaijaLearn Cent) to another
-  /// user, or to yourself (self-funding), via the atomic
-  /// transfer_app_currency RPC. Self-recipient is valid here.
-  Future<void> sendAppCurrency({
+  /// Sends CP + Cent combined (as one total, in the smallest unit)
+  /// from the sender's real ZTC wallet into the recipient's app
+  /// currency balance, via one atomic RPC. CP and Cent are one
+  /// currency — there is only ever one debit from one wallet.
+  Future<String?> sendToApp({
     required String recipientUserId,
-    required double unitAmount,
-    String? note,
-  }) async {
-    final result = await _client.rpc('transfer_app_currency', params: {
-      'p_app_id': appId,
-      'p_recipient_user_id': recipientUserId,
-      'p_unit_amount': unitAmount,
-      'p_note': note,
-    }).timeout(_timeout);
-
-    if (!(result is Map && result['success'] == true)) {
-      throw Exception('Transfer failed');
-    }
-  }
-
-  /// Sends CP, converted into THIS app's own currency for the
-  /// recipient — via send_cp_to_app_currency, which debits the
-  /// sender's real CP wallet and credits the recipient's
-  /// app_currency_balances row for [appId], using that app's own
-  /// registered conversion rate (cents_per_unit).
-  ///
-  /// Sending to yourself is valid and intentional — that's how a user
-  /// converts their own CP into their own app-currency balance for
-  /// the first time.
-  ///
-  /// This replaced a call to transfer_cp, which only moved CP between
-  /// regular wallets and never touched app_currency_balances at all —
-  /// meaning a "CP" send through an app card never actually reached
-  /// the app it was sent through.
-  Future<String?> sendCp({
-    required String recipientUserId,
-    required double cpAmount,
+    required int totalCents,
     String? note,
   }) async {
     try {
-      final result = await _client.rpc('send_cp_to_app_currency', params: {
+      final result = await _client.rpc('send_wallet_amount_to_app', params: {
         'p_app_id': appId,
         'p_recipient_user_id': recipientUserId,
-        'p_cp_amount': cpAmount,
+        'p_total_cents': totalCents,
         'p_note': (note?.isEmpty ?? true) ? null : note,
       }).timeout(_timeout);
 
       if (result is Map && result['success'] == true) return null;
+      if (result is Map && result['error'] != null) return result['error'].toString();
       return 'Transfer failed';
     } on PostgrestException catch (e) {
       return e.message;
@@ -299,6 +269,18 @@ class AppSendMoneyScreen extends HookConsumerWidget {
       searchResults.value = [];
     }
 
+    void onCentChanged(String value) {
+      final raw = int.tryParse(value) ?? 0;
+      if (raw >= 1000) {
+        final overflowCp = raw ~/ 1000;
+        final remainder = raw % 1000;
+        final currentCp = int.tryParse(cpController.text) ?? 0;
+        cpController.text = (currentCp + overflowCp).toString();
+        centController.text = remainder.toString();
+        centController.selection = TextSelection.collapsed(offset: centController.text.length);
+      }
+    }
+
     Future<void> handleSend() async {
       final recipient = selectedRecipient.value;
       if (recipient == null) {
@@ -306,10 +288,11 @@ class AppSendMoneyScreen extends HookConsumerWidget {
         return;
       }
 
-      final cpAmount = double.tryParse(cpController.text) ?? 0;
-      final centAmount = double.tryParse(centController.text) ?? 0;
+      final cp = int.tryParse(cpController.text) ?? 0;
+      final cent = int.tryParse(centController.text) ?? 0;
+      final totalCents = (cp * 1000) + cent;
 
-      if (cpAmount <= 0 && centAmount <= 0) {
+      if (totalCents <= 0) {
         error.value = 'Enter at least one amount (CP or Cent)';
         return;
       }
@@ -318,37 +301,18 @@ class AppSendMoneyScreen extends HookConsumerWidget {
       error.value = null;
 
       try {
-        // Send CP first (if amount > 0)
-        if (cpAmount > 0) {
-          final sendError = await repo.sendCp(
-            recipientUserId: recipient.userId,
-            cpAmount: cpAmount,
-            note: noteController.text.isEmpty ? null : noteController.text,
-          );
-          if (sendError != null) {
-            throw Exception(sendError);
-          }
-        }
-
-        // Then send Cent (if amount > 0)
-        if (centAmount > 0) {
-          await repo.sendAppCurrency(
-            recipientUserId: recipient.userId,
-            unitAmount: centAmount,
-            note: noteController.text.isEmpty ? null : noteController.text,
-          );
+        final sendError = await repo.sendToApp(
+          recipientUserId: recipient.userId,
+          totalCents: totalCents,
+          note: noteController.text.isEmpty ? null : noteController.text,
+        );
+        if (sendError != null) {
+          throw Exception(sendError);
         }
 
         if (context.mounted) {
-          String amountSummary = '';
-          if (cpAmount > 0) amountSummary += '$cpAmount CP';
-          if (centAmount > 0) {
-            if (amountSummary.isNotEmpty) amountSummary += ' and ';
-            amountSummary += '$centAmount Cent';
-          }
-
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Sent $amountSummary to ${appNames[appId]}')),
+            SnackBar(content: Text('Sent $cp CP $cent Cent to ${appNames[appId]}')),
           );
           Future.delayed(const Duration(seconds: 1), () {
             if (context.mounted) Navigator.pop(context);
@@ -466,42 +430,6 @@ class AppSendMoneyScreen extends HookConsumerWidget {
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r)),
                       prefixIcon: const Icon(Icons.account_balance_wallet_outlined),
                     ),
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  ),
-                  SizedBox(height: 4.h),
-                  Text(
-                    "Converts your CP into ${appNames[appId]}'s currency. You can send to yourself to fund your own balance from CP.",
-                    style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                  ),
-                  SizedBox(height: 16.h),
-                  Text('Send Cent', style: tt.labelLarge?.copyWith(color: cs.onSurfaceVariant)),
-                  SizedBox(height: 8.h),
-                  TextField(
-                    controller: centController,
-                    decoration: InputDecoration(
-                      labelText: 'Amount (Cent)',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r)),
-                      prefixIcon: const Icon(Icons.savings_outlined),
-                    ),
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  ),
-                  SizedBox(height: 4.h),
-                  Text(
-                    "Sends directly into the recipient's ${appNames[appId]} balance. You can send to yourself to fund your own balance.",
-                    style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                  ),
-                  SizedBox(height: 24.h),
-                  Text('Amount', style: tt.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
-                  SizedBox(height: 16.h),
-                  Text('Send CP', style: tt.labelLarge?.copyWith(color: cs.onSurfaceVariant)),
-                  SizedBox(height: 8.h),
-                  TextField(
-                    controller: cpController,
-                    decoration: InputDecoration(
-                      labelText: 'Amount (CP)',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r)),
-                      prefixIcon: const Icon(Icons.account_balance_wallet_outlined),
-                    ),
                     keyboardType: TextInputType.number,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   ),
@@ -522,23 +450,37 @@ class AppSendMoneyScreen extends HookConsumerWidget {
                     ),
                     keyboardType: TextInputType.number,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    onChanged: (value) {
-                      final raw = int.tryParse(value) ?? 0;
-                      if (raw >= 1000) {
-                        final overflowCp = raw ~/ 1000;
-                        final remainder = raw % 1000;
-                        final currentCp = int.tryParse(cpController.text) ?? 0;
-                        cpController.text = (currentCp + overflowCp).toString();
-                        centController.text = remainder.toString();
-                        centController.selection = TextSelection.collapsed(offset: centController.text.length);
-                      }
-                    },
+                    onChanged: onCentChanged,
                   ),
                   SizedBox(height: 4.h),
                   Text(
                     "Sends directly into the recipient's ${appNames[appId]} balance. You can send to yourself to fund your own balance.",
                     style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                   ),
+                  SizedBox(height: 8.h),
+                  Builder(builder: (context) {
+                    final cp = int.tryParse(cpController.text) ?? 0;
+                    final cent = int.tryParse(centController.text) ?? 0;
+                    if (cp == 0 && cent == 0) return const SizedBox.shrink();
+                    return Text(
+                      'Total: $cp CP $cent Cent',
+                      style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant, fontWeight: FontWeight.w600),
+                    );
+                  }),
+                  SizedBox(height: 16.h),
+                  TextField(
+                    controller: noteController,
+                    decoration: InputDecoration(
+                      labelText: 'Note (Optional)',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r)),
+                      prefixIcon: const Icon(Icons.note),
+                    ),
+                    maxLines: 3,
+                  ),
+                  if (error.value != null) ...[
+                    SizedBox(height: 12.h),
+                    Text(error.value!, style: TextStyle(color: cs.error)),
+                  ],
                   SizedBox(height: 32.h),
                   SizedBox(
                     width: double.infinity,
@@ -549,9 +491,9 @@ class AppSendMoneyScreen extends HookConsumerWidget {
                           error.value = 'Select a recipient from the search results';
                           return;
                         }
-                        final cpAmount = double.tryParse(cpController.text) ?? 0;
-                        final centAmount = double.tryParse(centController.text) ?? 0;
-                        if (cpAmount <= 0 && centAmount <= 0) {
+                        final cp = int.tryParse(cpController.text) ?? 0;
+                        final cent = int.tryParse(centController.text) ?? 0;
+                        if (cp <= 0 && cent <= 0) {
                           error.value = 'Enter at least one amount (CP or Cent)';
                           return;
                         }
@@ -594,32 +536,21 @@ class AppSendMoneyScreen extends HookConsumerWidget {
                           ],
                         ),
                         SizedBox(height: 12.h),
-                        if ((double.tryParse(cpController.text) ?? 0) > 0) ...[
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text('CP Amount', style: tt.bodyMedium),
-                              Text(
-                                '${cpController.text} CP',
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('Amount', style: tt.bodyMedium),
+                            Builder(builder: (context) {
+                              final cp = int.tryParse(cpController.text) ?? 0;
+                              final cent = int.tryParse(centController.text) ?? 0;
+                              return Text(
+                                '$cp CP $cent Cent',
                                 style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
-                              ),
-                            ],
-                          ),
-                          SizedBox(height: 12.h),
-                        ],
-                        if ((double.tryParse(centController.text) ?? 0) > 0) ...[
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text('Cent Amount', style: tt.bodyMedium),
-                              Text(
-                                '${centController.text} Cent',
-                                style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
-                              ),
-                            ],
-                          ),
-                          SizedBox(height: 12.h),
-                        ],
+                              );
+                            }),
+                          ],
+                        ),
+                        SizedBox(height: 12.h),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
