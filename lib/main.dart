@@ -16,7 +16,8 @@ import 'src/theme/theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
+  WidgetsFlutterBinding.ensureInitialized();
+FlutterNativeSplash.preserve(widgetsBinding: WidgetsFlutterBinding.instance);
 
   try {
     const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
