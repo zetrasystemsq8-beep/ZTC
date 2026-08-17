@@ -65,6 +65,13 @@ jobs:
             dart run flutter_native_splash:create
           fi
 
+      - name: Extract Version from pubspec.yaml
+        id: version
+        run: |
+          VERSION=$(grep "version:" pubspec.yaml | head -1 | awk '{print $2}' | cut -d'+' -f1)
+          echo "app_version=$VERSION" >> $GITHUB_OUTPUT
+          echo "App Version: $VERSION"
+
       - name: Analyze
         run: flutter analyze || true
 
@@ -74,8 +81,47 @@ jobs:
       - name: Build Release APK
         run: flutter build apk --release --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
 
-      - name: Upload APK
+      - name: Build AAB (for Play Store)
+        run: flutter build appbundle --release --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+
+      - name: Upload APK to Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ztc-bank-apk
+          name: ztc-bank-apk-${{ steps.version.outputs.app_version }}
           path: build/app/outputs/flutter-apk/app-release.apk
+
+      - name: Upload AAB to Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ztc-bank-aab-${{ steps.version.outputs.app_version }}
+          path: build/app/outputs/bundle/release/app-release.aab
+
+      - name: Create GitHub Release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ steps.version.outputs.app_version }}
+          release_name: ZTC Bank v${{ steps.version.outputs.app_version }}
+          body: |
+            ## ZTC Bank Release v${{ steps.version.outputs.app_version }}
+            
+            **APK Download:** Available in artifacts
+            **AAB Download:** Available in artifacts
+            
+            ### What's New
+            - Check release notes or git log for details
+          draft: false
+          prerelease: false
+
+      - name: Upload Release Assets
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.version.outputs.app_version }}
+          files: |
+            build/app/outputs/flutter-apk/app-release.apk
+            build/app/outputs/bundle/release/app-release.aab
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
