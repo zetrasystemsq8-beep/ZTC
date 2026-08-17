@@ -26,102 +26,29 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Flutter Version
-        run: flutter --version
-
-      - name: Cache Gradle
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
-
-      - name: Cache Pub Packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.pub-cache
-          key: ${{ runner.os }}-pub-${{ hashFiles('pubspec.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-pub-
-
-      - name: Create Android Project (only if missing)
-        run: |
-          if [ ! -d "android" ]; then
-            flutter create --platforms=android .
-          fi
-
       - name: Install Dependencies
         run: flutter pub get
 
-      - name: Generate App Icons
-        run: dart run flutter_launcher_icons
-
-      - name: Generate Splash Screen
+      - name: Upgrade Gradle
         run: |
-          if grep -q "flutter_native_splash" pubspec.yaml; then
-            dart run flutter_native_splash:create
-          fi
-
-      - name: Extract Version from pubspec.yaml
-        id: version
-        run: |
-          VERSION=$(grep "version:" pubspec.yaml | head -1 | awk '{print $2}' | cut -d'+' -f1)
-          echo "app_version=$VERSION" >> $GITHUB_OUTPUT
-          echo "App Version: $VERSION"
-
-      - name: Analyze
-        run: flutter analyze || true
-
-      - name: Run Tests
-        run: flutter test
+          cd android
+          ./gradlew wrapper --gradle-version 8.14.0
+          cd ..
 
       - name: Build Release APK
         run: flutter build apk --release --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
 
-      - name: Build AAB (for Play Store)
+      - name: Build AAB
         run: flutter build appbundle --release --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
 
-      - name: Upload APK to Artifacts
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ztc-bank-apk-${{ steps.version.outputs.app_version }}
+          name: ztc-bank-release-apk
           path: build/app/outputs/flutter-apk/app-release.apk
 
-      - name: Upload AAB to Artifacts
+      - name: Upload AAB Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ztc-bank-aab-${{ steps.version.outputs.app_version }}
+          name: ztc-bank-release-aab
           path: build/app/outputs/bundle/release/app-release.aab
-
-      - name: Create GitHub Release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: v${{ steps.version.outputs.app_version }}
-          release_name: ZTC Bank v${{ steps.version.outputs.app_version }}
-          body: |
-            ## ZTC Bank Release v${{ steps.version.outputs.app_version }}
-            
-            **APK Download:** Available in artifacts
-            **AAB Download:** Available in artifacts
-            
-            ### What's New
-            - Check release notes or git log for details
-          draft: false
-          prerelease: false
-
-      - name: Upload Release Assets
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: v${{ steps.version.outputs.app_version }}
-          files: |
-            build/app/outputs/flutter-apk/app-release.apk
-            build/app/outputs/bundle/release/app-release.aab
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
