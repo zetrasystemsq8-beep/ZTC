@@ -15,7 +15,7 @@ import 'src/routing/app_router.dart';
 import 'src/theme/theme.dart';
 
 Future<void> main() async {
-  final widgetsBinding = WidgetsBinding.ensureInitialized();
+  WidgetsFlutterBinding.ensureInitialized();
   FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
 
   try {
