@@ -72,10 +72,19 @@ jobs:
         run: flutter test
 
       - name: Build Release APK
-        run: flutter build apk --release --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+        run: flutter build apk --release --android-skip-build-dependency-validation --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
 
-      - name: Upload APK
+      - name: Build Release AAB
+        run: flutter build appbundle --release --android-skip-build-dependency-validation --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: ztc-bank-apk
           path: build/app/outputs/flutter-apk/app-release.apk
+
+      - name: Upload AAB Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ztc-bank-aab
+          path: build/app/outputs/bundle/release/app-release.aab
