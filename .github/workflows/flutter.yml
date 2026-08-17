@@ -26,29 +26,56 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Flutter Version
+        run: flutter --version
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Cache Pub Packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
+
+      - name: Create Android Project (only if missing)
+        run: |
+          if [ ! -d "android" ]; then
+            flutter create --platforms=android .
+          fi
+
       - name: Install Dependencies
         run: flutter pub get
 
-      - name: Upgrade Gradle
+      - name: Generate App Icons
+        run: dart run flutter_launcher_icons
+
+      - name: Generate Splash Screen
         run: |
-          cd android
-          ./gradlew wrapper --gradle-version 8.14.0
-          cd ..
+          if grep -q "flutter_native_splash" pubspec.yaml; then
+            dart run flutter_native_splash:create
+          fi
+
+      - name: Analyze
+        run: flutter analyze || true
+
+      - name: Run Tests
+        run: flutter test
 
       - name: Build Release APK
         run: flutter build apk --release --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
 
-      - name: Build AAB
-        run: flutter build appbundle --release --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
-
-      - name: Upload APK Artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: ztc-bank-release-apk
+          name: ztc-bank-apk
           path: build/app/outputs/flutter-apk/app-release.apk
-
-      - name: Upload AAB Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ztc-bank-release-aab
-          path: build/app/outputs/bundle/release/app-release.aab
