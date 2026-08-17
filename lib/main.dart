@@ -1,3 +1,4 @@
+import 'dart:io'; // <-- added for exit()
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
@@ -5,15 +6,16 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:package_info_plus/package_info_plus.dart'; // <-- added
 import 'src/imports/packages_imports.dart';
 import 'src/imports/core_imports.dart';
 import 'src/app.dart';
 import 'src/config/app_config.dart';
 import 'src/routing/app_router.dart';
-import 'src/theme/theme.dart'; // adjust path to wherever buildLightTheme/buildDarkTheme live
+import 'src/theme/theme.dart';
 
 Future<void> main() async {
-  final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
+  final widgetsBinding = WidgetsBinding.ensureInitialized();
   FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
 
   try {
@@ -46,6 +48,10 @@ Future<void> main() async {
     await AppConfig.init();
 
     FlutterNativeSplash.remove();
+
+    // ----- VERSION CHECK (inserted before runApp) -----
+    await _checkAppVersion();
+    // ------------------------------------------------
 
     runApp(
       EasyLocalization(
@@ -82,7 +88,6 @@ class MyApp extends ConsumerWidget {
         return MaterialApp.router(
           title: 'ztc_bank',
           debugShowCheckedModeBanner: false,
-          // TODO: replace '#6750A4' with your real brand hex if you have one
           theme: buildLightTheme(primaryColorHex: '#6750A4'),
           darkTheme: buildDarkTheme(primaryColorHex: '#6750A4'),
           themeMode: ThemeMode.system,
@@ -141,3 +146,29 @@ class ErrorApp extends StatelessWidget {
     );
   }
 }
+
+// ----- VERSION CHECK FUNCTION (added at bottom) -----
+Future<void> _checkAppVersion() async {
+  try {
+    final packageInfo = await PackageInfo.fromPlatform();
+    final currentVersion = packageInfo.version;
+
+    final response = await Supabase.instance.client
+        .from('app_versions')
+        .select()
+        .eq('app_name', 'ztc_bank')
+        .maybeSingle();
+
+    if (response != null) {
+      final minVersion = response['min_version'] as String;
+      final forceUpdate = response['force_update'] as bool;
+
+      if (forceUpdate && currentVersion != minVersion) {
+        exit(0); // Block app
+      }
+    }
+  } catch (e) {
+    print('Version check: $e');
+  }
+}
+// ----------------------------------------------------
